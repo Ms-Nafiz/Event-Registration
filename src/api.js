@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // আপনার লারাভেল ব্যাকএন্ডের অ্যাড্রেস
-const API_URL = 'https://event.cclcatv.com';
+const API_URL = '/';
 
 const api = axios.create({
   baseURL: API_URL,
