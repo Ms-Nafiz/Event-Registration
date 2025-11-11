@@ -6,7 +6,7 @@ const API_URL = '/';
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
-  // withXSRFToken: true,
+  withXSRFToken: true,
   // xsrfCookieName: 'XSRF-TOKEN',
   // xsrfHeaderName: 'X-XSRF-TOKEN',
 });
