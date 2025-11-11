@@ -35,7 +35,7 @@ export default function Login() {
       <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8 space-y-6">
         
         <h2 className="text-3xl font-extrabold text-gray-900 text-center border-b pb-4">
-          অনুষ্ঠানে লগইন
+          লগইন
         </h2>
         
         <form className="space-y-6" onSubmit={handleSubmit}>
