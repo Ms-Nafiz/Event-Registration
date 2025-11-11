@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@font-face {
+  font-family: 'NotoSansBengali';
+  src: url('/src/assets/fonts/NotoSansBengali.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+body {
+  font-family: 'NotoSansBengali', sans-serif;
+}
