@@ -8,4 +8,7 @@ const api = axios.create({
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
 });
 
+api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+
 export default api;
