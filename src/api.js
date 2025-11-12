@@ -10,15 +10,17 @@ const api = axios.create({
   // withXSRFToken: true,
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = Cookies.get("XSRF-TOKEN");
-    if (token) {
-      config.headers["X-XSRF-TOKEN"] = token;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = Cookies.get("XSRF-TOKEN");
+//     if (token) {
+//       config.headers["X-XSRF-TOKEN"] = token;
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
 
 export default api;
