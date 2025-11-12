@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true); // <-- লোডার চালু
     try {
       await getCsrfToken();
-      await api.post("/api/login", { email, password });
+      await api.post("/login", { email, password });
       const response = await api.get("/api/user");
       setUser(response.data);
     } catch (error) {
