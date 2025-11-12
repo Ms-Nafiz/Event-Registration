@@ -10,14 +10,14 @@ const api = axios.create({
   withXSRFToken: true,
 });
 
-// api.defaults.xsrfCookieName = 'XSRF-TOKEN';
-// api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 // Interceptor — প্রতিটি request এর আগে XSRF token header এ বসানো হবে
-api.interceptors.request.use((config) => {
-  const token = Cookies.get("XSRF-TOKEN");
-  if (token) {
-    config.headers["X-XSRF-TOKEN"] = decodeURIComponent(token);
-  }
-  return config;
-});
+// api.interceptors.request.use((config) => {
+//   const token = Cookies.get("XSRF-TOKEN");
+//   if (token) {
+//     config.headers["X-XSRF-TOKEN"] = decodeURIComponent(token);
+//   }
+//   return config;
+// });
 export default api;
