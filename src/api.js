@@ -6,9 +6,10 @@ const API_URL = 'https://event.cclcatv.com';
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
+  withXSRFToken: true,
 });
 
-api.defaults.xsrfCookieName = 'XSRF-TOKEN';
-api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+// api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+// api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 
 export default api;
