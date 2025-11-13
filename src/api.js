@@ -7,7 +7,7 @@ const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
-  // withXSRFToken: true,
+  withXSRFToken: true,
   // headers: {
   //   "X-Requested-With": "XMLHttpRequest",
   // },
@@ -18,17 +18,25 @@ const api = axios.create({
 // api.defaults.xsrfCookieName = 'XSRF-TOKEN';
 // api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 // Automatically add X-XSRF-TOKEN from cookie
-axios.interceptors.request.use((config) => {
-    const cookies = document.cookie.split(';');
-    const xsrfToken = cookies
-        .find(cookie => cookie.trim().startsWith('XSRF-TOKEN='))
-        ?.split('=')[1];
+// axios.interceptors.request.use((config) => {
+//     const cookies = document.cookie.split(';');
+//     const xsrfToken = cookies
+//         .find(cookie => cookie.trim().startsWith('XSRF-TOKEN='))
+//         ?.split('=')[1];
 
-    if (xsrfToken) {
-        config.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
-    }
+//     if (xsrfToken) {
+//         config.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
+//     }
 
-    return config;
-});
+//     return config;
+// });
+async () => {
+    const res = await fetch('https://event.cclcatv.com/sanctum/csrf-cookie', {
+        credentials: 'include'
+    });
+    console.log('Status:', res.status);
+    for (let [k, v] of res.headers) console.log(k, v);
+    console.log('Cookies:', document.cookie);
+};
 
 export default api;
