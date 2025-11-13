@@ -5,12 +5,12 @@ import Cookies from "js-cookie";
 const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: '/',
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
   // withXSRFToken: true,
-  // headers: {
-  //   "X-Requested-With": "XMLHttpRequest",
-  // },
+  headers: {
+    "X-Requested-With": "XMLHttpRequest",
+  },
 });
 
 // api.defaults.xsrfCookieName = 'XSRF-TOKEN';
