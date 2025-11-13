@@ -1,6 +1,0 @@
-/*    /index.html   200
-/sanctum/csrf-cookie    https://event.cclcatv.com/sanctum/csrf-cookie    200
-/login                  https://event.cclcatv.com/login                  200
-/register               https://event.cclcatv.com/register               200
-/logout                 https://event.cclcatv.com/logout                 200
-/api/*                  https://event.cclcatv.com/:splat                  200
