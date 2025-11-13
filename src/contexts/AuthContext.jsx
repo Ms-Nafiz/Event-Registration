@@ -26,16 +26,30 @@ export const AuthProvider = ({ children }) => {
   const getCsrfToken = async () => {
     try {
       const res = await api.get("/sanctum/csrf-cookie");
-      console.log('Status:', res.status);
-        console.log('Headers:', res.headers);
+      console.log("Status:", res.status);
+      console.log("Headers:", res.headers);
 
-        // Cookie চেক করো
-        const cookies = document.cookie;
-        console.log('All Cookies:', cookies);
+      // Cookie চেক করো
+      const cookies = document.cookie;
+      console.log("All Cookies:", cookies);
 
-        // XSRF-TOKEN আছে কি?
-        const xsrf = cookies.split(';').find(c => c.trim().startsWith('XSRF-TOKEN'));
-        console.log('XSRF-TOKEN:', xsrf);
+      // XSRF-TOKEN আছে কি?
+      const xsrf = cookies
+        .split(";")
+        .find((c) => c.trim().startsWith("XSRF-TOKEN"));
+      console.log("XSRF-TOKEN:", xsrf);
+      // -------------------
+      async () => {
+        const res = await fetch(
+          "https://event.cclcatv.com/sanctum/csrf-cookie",
+          {
+            credentials: "include",
+          }
+        );
+        console.log("Status:", res.status);
+        for (let [k, v] of res.headers) console.log(k, v);
+        console.log("Cookies:", document.cookie);
+      };
     } catch (error) {
       console.error("CSRF Token fetch failed:", error); // দেখুন এখানে কোনো এরর আসে কিনা
     }

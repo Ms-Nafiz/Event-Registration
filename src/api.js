@@ -30,13 +30,6 @@ const api = axios.create({
 
 //     return config;
 // });
-async () => {
-    const res = await fetch('https://event.cclcatv.com/sanctum/csrf-cookie', {
-        credentials: 'include'
-    });
-    console.log('Status:', res.status);
-    for (let [k, v] of res.headers) console.log(k, v);
-    console.log('Cookies:', document.cookie);
-};
+
 
 export default api;
