@@ -1,6 +1,28 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://event.cclcatv.com/api/$1" },
-    { "source": "/sanctum/(.*)", "destination": "https://event.cclcatv.com/sanctum/$1" }
+    {
+      "source": "/sanctum/:path*",
+      "destination": "https://event.cclcatv.com/sanctum/:path*"
+    },
+    {
+      "source": "/login",
+      "destination": "https://event.cclcatv.com/login"
+    },
+    {
+      "source": "/logout",
+      "destination": "https://event.cclcatv.com/logout"
+    },
+    {
+      "source": "/register",
+      "destination": "https://event.cclcatv.com/register"
+    },
+    {
+      "source": "/user",
+      "destination": "https://event.cclcatv.com/user"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://event.cclcatv.com/api/:path*"
+    }
   ]
 }
