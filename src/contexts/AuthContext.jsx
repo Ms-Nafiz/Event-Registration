@@ -25,7 +25,17 @@ export const AuthProvider = ({ children }) => {
 
   const getCsrfToken = async () => {
     try {
-      await api.get("/sanctum/csrf-cookie");
+      const res = await api.get("/sanctum/csrf-cookie");
+      console.log('Status:', res.status);
+        console.log('Headers:', res.headers);
+
+        // Cookie চেক করো
+        const cookies = document.cookie;
+        console.log('All Cookies:', cookies);
+
+        // XSRF-TOKEN আছে কি?
+        const xsrf = cookies.split(';').find(c => c.trim().startsWith('XSRF-TOKEN'));
+        console.log('XSRF-TOKEN:', xsrf);
     } catch (error) {
       console.error("CSRF Token fetch failed:", error); // দেখুন এখানে কোনো এরর আসে কিনা
     }
