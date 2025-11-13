@@ -7,7 +7,7 @@ const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
-  // withXSRFToken: true,
+  withXSRFToken: true,
   // headers: {
   //   "X-Requested-With": "XMLHttpRequest",
   // },
