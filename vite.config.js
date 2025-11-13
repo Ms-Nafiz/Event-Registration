@@ -8,4 +8,18 @@ export default defineConfig({
     tailwindcss(),
     react()
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://event.cclcatv.com', // তোমার Laravel API URL
+        changeOrigin: true,
+        secure: true,
+      },
+      '/sanctum': {
+        target: 'https://event.cclcatv.com',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })
