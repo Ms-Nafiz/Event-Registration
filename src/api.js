@@ -13,7 +13,8 @@ const api = axios.create({
   // },
 });
 
-axios.defaults.withCredentials = true;
+api.defaults.withCredentials = true;
+api.defaults.withXSRFToken = true;
 // api.defaults.xsrfCookieName = 'XSRF-TOKEN';
 // api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 api.interceptors.request.use(
