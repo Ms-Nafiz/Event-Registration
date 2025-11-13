@@ -32,15 +32,30 @@ export default function RegistrationFormPage() {
   const [successData, setSuccessData] = useState(null);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
-  // গ্রুপ লোড (ম্যানুয়ালি বা ফায়ারবেস থেকে)
-  useEffect(() => {
-    // আপনি চাইলে এখানে Firebase থেকে গ্রুপ আনতে পারেন, অথবা আপাতত হার্ডকোড রাখতে পারেন
-    setGroups([
-      { id: "1", name: "Group A" },
-      { id: "2", name: "Group B" },
-    ]);
-    setFormData((prev) => ({ ...prev, group_id: "1" }));
-  }, []);
+  // গ্রুপ লোড (ফায়ারবেস থেকে)
+    useEffect(() => {
+        const fetchGroups = async () => {
+            try {
+                const querySnapshot = await getDocs(collection(db, "groups"));
+                const groupsList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                setGroups(groupsList);
+
+                // প্রথম গ্রুপটিকে ডিফল্ট হিসেবে সিলেক্ট করুন (যদি গ্রুপ থাকে)
+                if (groupsList.length > 0) {
+                    setFormData(prev => ({ ...prev, group_id: groupsList[0].id }));
+                }
+            } catch (error) {
+                console.error("Error fetching groups: ", error);
+                toast.error('গ্রুপ তালিকা লোড করা যায়নি।');
+            }
+        };
+
+        fetchGroups();
+    }, []);
 
   // ১. সাধারণ ইনপুট হ্যান্ডেলার
   const handleChange = (e) => {
@@ -224,7 +239,7 @@ export default function RegistrationFormPage() {
                 ) : (
                   groups.map((group) => (
                     <option key={group.id} value={group.id.toString()}>
-                      {group.name}
+                      {group.description}-{group.name}
                     </option>
                   ))
                 )}
