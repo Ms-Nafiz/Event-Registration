@@ -5,7 +5,7 @@ import Cookies from "js-cookie";
 // আপনার লারাভেল ব্যাকএন্ডের অ্যাড্রেস
 const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 
-const api = ky.create({
+const api = ky.extend({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
   credentials: 'include',
