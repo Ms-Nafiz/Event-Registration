@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://event.cclcatv.com/api/$1" },
+    { "source": "/sanctum/(.*)", "destination": "https://event.cclcatv.com/sanctum/$1" }
+  ]
+}
