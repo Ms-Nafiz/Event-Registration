@@ -8,13 +8,13 @@ const api = axios.create({
   baseURL: API_URL,
   withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
   // withXSRFToken: true,
-  // headers: {
-  //   "X-Requested-With": "XMLHttpRequest",
-  // },
+  headers: {
+    "X-Requested-With": "XMLHttpRequest",
+  },
 });
 
-api.defaults.xsrfCookieName = 'XSRF-TOKEN';
-api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+// api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+// api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 // api.interceptors.request.use(
 //   (config) => {
 //     const token = Cookies.get("XSRF-TOKEN");
