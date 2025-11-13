@@ -1,42 +1,44 @@
-// src/components/Register.jsx
-
-import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
-import toast from "react-hot-toast";
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function Register() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordConfirmation, setPasswordConfirmation] = useState("");
-
-  const { register, authLoading } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (password !== confirmPassword) {
+      return toast.error('পাসওয়ার্ড দুটি মিলছে না!');
+    }
+
+    if (password.length < 6) {
+      return toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+    }
+
+    setLoading(true);
+    
     try {
-      await register(name, email, password, passwordConfirmation);
-      // রেজিস্ট্রেশন সফল হলে ভেরিফাই পেজে পাঠান
-      navigate("/verify-email");
-      toast.success(
-        "🎉 রেজিস্ট্রেশন সফল! অনুগ্রহ করে আপনার ইমেইল ভেরিফাই করুন।",
-        { className: "font-bangla" }
-      );
+      await register(name, email, password);
+      toast.success('🎉 অ্যাডমিন অ্যাকাউন্ট তৈরি সফল!');
+      navigate('/admin/dashboard'); // সরাসরি ড্যাশবোর্ডে পাঠান
     } catch (error) {
-      if (error.response && error.response.status === 422) {
-        // ভ্যালিডেশন ত্রুটি
-        const errors = error.response.data.errors;
-        toast.error(Object.values(errors)[0][0] || "ফর্মের ডেটা ভুল আছে।", {
-          className: "font-bangla",
-        });
+      console.error(error);
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error('এই ইমেইল দিয়ে ইতিমধ্যে অ্যাকাউন্ট খোলা আছে।');
       } else {
-        toast.error("❌ রেজিস্ট্রেশনে ত্রুটি হয়েছে।", {
-          className: "font-bangla",
-        });
+        toast.error('রেজিস্ট্রেশন ব্যর্থ হয়েছে: ' + error.message);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,77 +48,64 @@ export default function Register() {
         <h2 className="text-3xl font-extrabold text-gray-900 text-center border-b pb-4">
           অ্যাডমিন রেজিস্ট্রেশন
         </h2>
-
+        
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              নাম
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">নাম</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" 
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ইমেইল
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল</label>
+            <input 
+              type="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" 
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              পাসওয়ার্ড
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" 
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              পাসওয়ার্ড নিশ্চিত করুন
-            </label>
-            <input
-              type="password"
-              value={passwordConfirmation}
-              onChange={(e) => setPasswordConfirmation(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড নিশ্চিত করুন</label>
+            <input 
+              type="password" 
+              value={confirmPassword} 
+              onChange={(e) => setConfirmPassword(e.target.value)} 
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" 
             />
           </div>
-
+          
           <button
             type="submit"
-            // --- বাটন আপডেট ---
-            disabled={authLoading}
-            className={`w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none cursor-pointer ${
-              authLoading
-                ? "bg-indigo-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
+            disabled={loading}
+            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white ${
+              loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
             }`}
           >
-            {authLoading ? "রেজিস্টার করা হচ্ছে..." : "রেজিস্টার"}
+            {loading ? 'অ্যাকাউন্ট তৈরি হচ্ছে...' : 'রেজিস্টার'}
           </button>
         </form>
 
         <div className="text-sm text-center pt-4 border-t mt-4">
-          <Link
-            to="/admin/login"
-            className="font-medium text-indigo-600 hover:text-indigo-500"
-          >
-            ইতিমধ্যে অ্যাকাউন্ট আছে? লগইন করুন
+          ইতিমধ্যে অ্যাকাউন্ট আছে?{' '}
+          <Link to="/admin/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+             লগইন করুন
           </Link>
         </div>
       </div>

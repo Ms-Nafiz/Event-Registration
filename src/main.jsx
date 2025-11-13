@@ -18,21 +18,19 @@ import ProfilePage from './pages/ProfilePage'; // <-- নতুন ইম্প�
 // --- পাবলিক পেজ ---
 import PublicEventRegistration from './pages/RegistrationFormPage'; // এই পেজটিই আমরা পাবলিক করবো
 
-// --- প্রোটেক্টেড রুট (অ্যাডমিন) ---
-function ProtectedRoute({ children }) {
-    const { user, loading } = useAuth();
-    if (loading) return <div>লোড হচ্ছে...</div>;
-    if (!user) return <Navigate to="/admin/login" replace />; // লগইন পেজে পাঠান
-    if (!user.email_verified_at) return <Navigate to="/verify-email" replace />;
-    return children;
-}
-
-// --- গেস্ট রুট (অ্যাডমিন লগইন/রেজিস্টার) ---
+// ১. গেস্ট রুট: লগইন করা থাকলে ড্যাশবোর্ডে পাঠাবে
 function GuestRoute({ children }) {
     const { user, loading } = useAuth();
     if (loading) return <div>লোড হচ্ছে...</div>;
-    // লগইন করা থাকলে অ্যাডমিন ড্যাশবোর্ডে পাঠান
     return user ? <Navigate to="/admin/dashboard" replace /> : children;
+}
+
+// ২. প্রোটেক্টেড রুট: লগইন না থাকলে লগইন পেজে পাঠাবে
+function ProtectedRoute({ children }) {
+    const { user, loading } = useAuth();
+    if (loading) return <div>লোড হচ্ছে...</div>;
+    if (!user) return <Navigate to="/admin/login" replace />;
+    return children;
 }
 
 function AppRouter() {

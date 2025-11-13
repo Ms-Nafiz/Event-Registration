@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
-import api from "../api"; // আপনার Axios instance
+import { db } from "../firebase"; // Firebase DB
+import { collection, addDoc, getDocs } from "firebase/firestore";
 import toast from "react-hot-toast";
-// import { useAuth } from "../contexts/AuthContext"; // যদি API কল করার জন্য Auth লাগে
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { EntryCardDocument } from "../components/EntryCardPDF"; // PDF কম্পোনেন্ট
+import QRCode from "qrcode";
 
 export default function RegistrationFormPage() {
   // প্রাথমিক সদস্য হিসেবে প্রধান রেজিস্ট্রেশনকারীকেই ধরা হলো
@@ -24,29 +27,20 @@ export default function RegistrationFormPage() {
     group_id: "",
   });
 
-  // useEffect ব্যবহার করে গ্রুপগুলো লোড করুন
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        const response = await api.get("/api/groups");
-        setGroups(response.data);
-        // প্রথম গ্রুপকে ডিফল্ট হিসেবে সেট করুন
-        if (response.data.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            group_id: response.data[0].id.toString(),
-          }));
-        }
-      } catch (error) {
-        toast.error("❌ গ্রুপ তালিকা লোড করা যায়নি।", {
-          className: "font-bangla",
-        });
-      }
-    };
-    fetchGroups();
-  }, []);
-
   const [loading, setLoading] = useState(false);
+
+  const [successData, setSuccessData] = useState(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+
+  // গ্রুপ লোড (ম্যানুয়ালি বা ফায়ারবেস থেকে)
+  useEffect(() => {
+    // আপনি চাইলে এখানে Firebase থেকে গ্রুপ আনতে পারেন, অথবা আপাতত হার্ডকোড রাখতে পারেন
+    setGroups([
+      { id: "1", name: "Group A" },
+      { id: "2", name: "Group B" },
+    ]);
+    setFormData((prev) => ({ ...prev, group_id: "1" }));
+  }, []);
 
   // ১. সাধারণ ইনপুট হ্যান্ডেলার
   const handleChange = (e) => {
@@ -84,72 +78,48 @@ export default function RegistrationFormPage() {
   };
 
   // ৫. ফর্ম সাবমিট
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setDownloadUrl(null);
+  // সাবমিট হ্যান্ডেলার (Firebase)
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setSuccessData(null);
 
-    // const totalMembers = formData.members.length;
+        try {
+            const totalMembers = formData.members.length;
+            // ইউনিক আইডি জেনারেট (সিম্পল)
+            const regId = 'HF-' + Math.floor(100000 + Math.random() * 900000);
 
-    // API-তে পাঠানোর জন্য ডেটা প্রস্তুত (পরিচ্ছন্ন সংস্করণ)
-    // আমরা এখানে ...formData ব্যবহার করছি না, যাতে ডুপ্লিকেট কী তৈরি না হয়
-    const dataToSend = {
-      name: formData.name,
-      mobile: formData.mobile,
-      email: formData.email,
-      group_id: formData.group_id,
-      transaction_id: formData.transactionId,
-      payment_status: formData.paymentStatus,
-      // totalMembers ব্যাকএন্ডে গণনা করা হচ্ছে, তাই না পাঠালেও চলে
+            const dataToSend = {
+                id: regId, // আমাদের নিজস্ব আইডি
+                ...formData,
+                totalMembers,
+                createdAt: new Date()
+            };
 
-      // সদস্যদের অ্যারে (এটিই মূল অংশ)
-      members: formData.members.map((member, index) => ({
-        member_name: index === 0 ? formData.name : member.member_name,
-        gender: member.gender,
-        t_shirt_size: member.t_shirt_size,
-        age: member.age || null, // বয়স খালি থাকলে null পাঠাবে
-      })),
-    };
+            // ১. ফায়ারবেসে সেভ করা
+            await addDoc(collection(db, "registrations"), dataToSend);
 
-    try {
-      // API ইন্টিগ্রেশন
-      const response = await api.post("/api/register-event", dataToSend);
+            // ২. QR কোড তৈরি করা (PDF এর জন্য)
+            const qrUrl = await QRCode.toDataURL(regId);
+            setQrCodeUrl(qrUrl);
+            setSuccessData(dataToSend); // এটি সেট করলেই বাটন দেখাবে
 
-      toast.success(
-        response.data.message || "✅ রেজিস্ট্রেশন সফল! ডেটা সেভ হয়েছে।",
-        {
-          duration: 5000,
-          className: "font-bangla",
+            toast.success('✅ রেজিস্ট্রেশন সফল!');
+            
+            // ফর্ম রিসেট
+            setFormData({
+                name: '', mobile: '', email: '', group_id: '1', 
+                transactionId: '', paymentStatus: 'Pending', 
+                members: [{ ...initialMember }]
+            });
+
+        } catch (error) {
+            console.error(error);
+            toast.error('ত্রুটি হয়েছে: ' + error.message);
+        } finally {
+            setLoading(false);
         }
-      );
-      // --- ডাউনলোড লিঙ্ক সেট করুন ---
-      if (response.data.download_url) {
-        setDownloadUrl(response.data.download_url);
-      }
-
-      // ফর্ম রিসেট
-      setFormData({
-        name: "",
-        mobile: "",
-        email: "",
-        group_id: groups.length > 0 ? groups[0].id.toString() : "",
-        transactionId: "",
-        paymentStatus: "Pending",
-        members: [{ ...initialMember, member_name: "" }],
-      });
-    } catch (error) {
-      let errorMessage = "❌ রেজিস্ট্রেশনের সময় একটি ত্রুটি হয়েছে।";
-      if (error.response && error.response.status === 422) {
-        const errors = error.response.data.errors;
-        errorMessage = Object.values(errors)[0][0] || "ফর্মের ডেটা ভুল আছে।";
-      } else if (error.response && error.response.data.message) {
-        errorMessage = error.response.data.message;
-      }
-      toast.error(errorMessage, { duration: 6000, className: "font-bangla" });
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   return (
     <div className="max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl font-bangla">
@@ -157,25 +127,23 @@ export default function RegistrationFormPage() {
         👨‍👩‍👧‍👦 বংশ অনুষ্ঠানের রেজিস্ট্রেশন ফর্ম
       </h2>
 
-      {downloadUrl && (
-        <div className="mb-6 p-4 bg-green-100 border border-green-400 rounded-lg text-center font-bangla">
-          <p className="text-lg font-semibold text-green-800">
-            আপনার রেজিস্ট্রেশন সফল হয়েছে!
-          </p>
-          <p className="text-sm text-gray-700 mb-4">
-            আপনার এন্ট্রি কার্ডটি ইমেইলে পাঠানো হয়েছে। আপনি চাইলে নিচের বাটন
-            থেকেও ডাউনলোড করতে পারেন।
-          </p>
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow hover:bg-green-700 transition"
-          >
-            📥 এন্ট্রি কার্ড ডাউনলোড করুন
-          </a>
-        </div>
-      )}
+      {/* --- ডাউনলোড বাটন (সফল হলে দেখাবে) --- */}
+                {successData && qrCodeUrl && (
+                    <div className="mb-6 p-4 bg-green-100 border border-green-400 rounded-lg text-center">
+                        <p className="text-lg font-bold text-green-800 mb-2">রেজিস্ট্রেশন সফল!</p>
+                        
+                        <PDFDownloadLink 
+                            document={<EntryCardDocument data={successData} qrCodeUrl={qrCodeUrl} />} 
+                            fileName={`entry-card-${successData.id}.pdf`}
+                        >
+                            {({ loading }) => 
+                                <button className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 font-bold">
+                                    {loading ? 'PDF তৈরি হচ্ছে...' : '📥 এন্ট্রি কার্ড ডাউনলোড করুন'}
+                                </button>
+                            }
+                        </PDFDownloadLink>
+                    </div>
+                )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* --- ১. মূল ব্যক্তি ও যোগাযোগের তথ্য --- */}
@@ -251,7 +219,6 @@ export default function RegistrationFormPage() {
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500"
               >
-                
                 {groups.length === 0 ? (
                   <option value="">গ্রুপ লোড হচ্ছে...</option>
                 ) : (

@@ -1,118 +1,61 @@
-// src/contexts/AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from "react";
-import api from "../api";
-import toast from "react-hot-toast";
+import { createContext, useContext, useEffect, useState } from 'react';
+import { auth } from '../firebase'; // আপনার firebase.js ফাইল থেকে
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  updateProfile 
+} from 'firebase/auth';
+import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState(false); // <-- এটি login/register/logout এর জন্য
 
+  // ইউজার লগইন আছে কিনা তা চেক করা
   useEffect(() => {
-    // অ্যাপ লোড হলে ইউজার তথ্য আনার চেষ্টা
-    api
-      .get("/api/user")
-      .then((response) => {
-        setUser(response.data);
-      })
-      .catch(() => {
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
-  const getCsrfToken = async () => {
+  // ১. রেজিস্ট্রেশন ফাংশন (নাম সহ)
+  const register = async (name, email, password) => {
     try {
-      const res = await api.get("/sanctum/csrf-cookie");
-      console.log("Status:", res.status);
-      console.log("Headers:", res.headers);
-
-      // Cookie চেক করো
-      const cookies = document.cookie;
-      console.log("All Cookies:", cookies);
-
-      // XSRF-TOKEN আছে কি?
-      const xsrf = cookies
-        .split(";")
-        .find((c) => c.trim().startsWith("XSRF-TOKEN"));
-      console.log("XSRF-TOKEN:", xsrf);
-    } catch (error) {
-      console.error("CSRF Token fetch failed:", error); // দেখুন এখানে কোনো এরর আসে কিনা
-    }
-  };
-
-  const login = async (email, password) => {
-    setAuthLoading(true); // <-- লোডার চালু
-    try {
-      await getCsrfToken();
-      await api.post("/login", { email, password });
-      const response = await api.get("/api/user");
-      setUser(response.data);
-    } catch (error) {
-      throw error; // ত্রুটিটি কম্পোনেন্টে ফেরত পাঠান
-    } finally {
-      setAuthLoading(false); // <-- লোডার বন্ধ
-    }
-  };
-
-  const register = async (name, email, password, password_confirmation) => {
-    setAuthLoading(true); // <-- লোডার চালু
-    try {
-      await getCsrfToken();
-      await api.post("/register", {
-        name,
-        email,
-        password,
-        password_confirmation,
+      // ফায়ারবেসে ইউজার তৈরি
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // ইউজারের ডিসপ্লে নেম (Display Name) আপডেট করা
+      await updateProfile(userCredential.user, {
+        displayName: name
       });
-      const response = await api.get("/api/user");
-      setUser(response.data);
+
+      // লোকাল স্টেট আপডেট (তাৎক্ষণিক নাম দেখানোর জন্য)
+      setUser({ ...userCredential.user, displayName: name });
+      
+      return userCredential.user;
     } catch (error) {
-      throw error; // ত্রুটিটি কম্পোনেন্টে ফেরত পাঠান
-    } finally {
-      setAuthLoading(false); // <-- লোডার বন্ধ
+      throw error;
     }
   };
 
-  const logout = async () => {
-    setAuthLoading(true); // <-- লোডার চালু
-    try {
-      await api.post("/logout");
-      setUser(null);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      setAuthLoading(false); // <-- লোডার বন্ধ
-    }
+  // ২. লগইন ফাংশন
+  const login = (email, password) => {
+    return signInWithEmailAndPassword(auth, email, password);
   };
 
-  // --- নতুন ফাংশন ---
-  // ভেরিফিকেশন ইমেইল আবার পাঠানোর জন্য
-  const resendVerificationEmail = async () => {
-    try {
-      await api.post("/email/verification-notification");
-      toast.success("📬 নতুন ভেরিফিকেশন লিংক পাঠানো হয়েছে!", {
-        className: "font-bangla",
-      });
-    } catch (error) {
-      toast.error("❌ লিংক পাঠাতে সমস্যা হয়েছে।", { className: "font-bangla" });
-    }
+  // ৩. লগআউট ফাংশন
+  const logout = () => {
+    return signOut(auth);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        register,
-        logout,
-        loading, // প্রাথমিক লোডিং
-        authLoading, // নতুন অ্যাকশন লোডিং
-        resendVerificationEmail,
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
