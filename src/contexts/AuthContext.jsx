@@ -25,9 +25,7 @@ export const AuthProvider = ({ children }) => {
 
   const getCsrfToken = async () => {
     try {
-      const res = await api.get("/sanctum/csrf-cookie", {
-        withCredentials: true,
-      });
+      const res = await api.get("/sanctum/csrf-cookie");
       console.log("Status:", res.status);
       console.log("Headers:", res.headers);
 
@@ -49,7 +47,7 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true); // <-- লোডার চালু
     try {
       await getCsrfToken();
-      await api.post("/login", { email, password }, { withCredentials: true });
+      await api.post("/login", { email, password });
       const response = await api.get("/api/user");
       setUser(response.data);
     } catch (error) {
