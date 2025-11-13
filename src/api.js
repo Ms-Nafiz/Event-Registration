@@ -6,8 +6,8 @@ import Cookies from "js-cookie";
 const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 
 const api = ky.extend({
-  baseURL: API_URL,
-  withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
+   prefixUrl: API_URL,
+  // withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
   credentials: 'include',
   // withXSRFToken: true,
   // headers: {
