@@ -13,8 +13,8 @@ const api = axios.create({
   },
 });
 
-// api.defaults.xsrfCookieName = 'XSRF-TOKEN';
-// api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
+api.defaults.xsrfCookieName = 'XSRF-TOKEN';
+api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 // api.interceptors.request.use(
 //   (config) => {
 //     const token = Cookies.get("XSRF-TOKEN");
