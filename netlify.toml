@@ -1,0 +1,35 @@
+[[redirects]]
+  from = "/sanctum/*"
+  to = "https://event.cclcatv.com/sanctum/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "https://event.cclcatv.com/login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/logout"
+  to = "https://event.cclcatv.com/logout"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/register"
+  to = "https://event.cclcatv.com/register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/user"
+  to = "https://event.cclcatv.com/user"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://event.cclcatv.com/api/:splat"
+  status = 200
+  force = true
