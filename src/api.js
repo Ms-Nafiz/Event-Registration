@@ -6,13 +6,14 @@ const API_URL = /*"http://localhost:8000";*/"https://event.cclcatv.com";
 
 const api = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
+  // withCredentials: true, // কুকি আদান-প্রদানের জন্য এটি অপরিহার্য
   // withXSRFToken: true,
   // headers: {
   //   "X-Requested-With": "XMLHttpRequest",
   // },
 });
 
+axios.defaults.withCredentials = true;
 // api.defaults.xsrfCookieName = 'XSRF-TOKEN';
 // api.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 api.interceptors.request.use(
