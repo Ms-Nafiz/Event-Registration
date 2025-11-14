@@ -9,12 +9,12 @@ Font.register({
 
 // ২. ইভেন্টের তথ্য (এখানে আপনার তথ্য দিন)
 const EVENT_DETAILS = {
-  title: "বার্ষিক বংশ মিলনমেলা ২০২৫",
-  date: "শুক্রবার, ২৫ ডিসেম্বর, ২০২৫",
+  title: "বার্ষিক বংশ মিলনমেলা ২০২৬",
+  date: "শুক্রবার, ২০ মার্চ, ২০২৬",
   time: "সকাল ১০:০০ ঘটিকা",
-  venue: "বংশ কনভেনশন সেন্টার, আগারগাঁও, ঢাকা",
-  organizer: "বংশ ফাউন্ডেশন কমিটি",
-  fbPage: "facebook.com/BongshoFoundation",
+  venue: "চাইডোবা প্রাথমিক বিদ্যালয় মাঠ প্রাঙ্গন, পাকুড়িয়া ভাঙ্গাপাড়া",
+  organizer: "হরকরা ফাউন্ডেশন কমিটি",
+  fbPage: "https://www.facebook.com/61577256966799",
   whatsapp: "+88017XXXXXXXX"
 };
 
@@ -189,7 +189,7 @@ export const EntryCardDocument = ({ data, qrCodeUrl }) => (
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>নাম:</Text>
-              <Text style={styles.value}>{data.name}</Text>
+              <Text style={styles.value}>{data.name+" "}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>মোবাইল:</Text>
@@ -197,7 +197,7 @@ export const EntryCardDocument = ({ data, qrCodeUrl }) => (
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>গ্রুপ/দল:</Text>
-              <Text style={styles.value}>{data.groupName || 'সাধারণ'}</Text>
+              <Text style={styles.value}>{data.groupName+" " || 'সাধারণ'}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>মোট সদস্য:</Text>
@@ -247,8 +247,8 @@ export const EntryCardDocument = ({ data, qrCodeUrl }) => (
           <View style={{ width: '100%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
               <Text style={{ fontSize: 10 }}>আইডি: <Text style={styles.redHighlight}>{data.id}</Text></Text>
-              <Text style={{ fontSize: 10 }}>নাম: {data.name}</Text>
-              <Text style={{ fontSize: 10 }}>গ্রুপ: {data.groupName}</Text>
+              <Text style={{ fontSize: 10 }}>নাম: {data.name+" "}</Text>
+              <Text style={{ fontSize: 10 }}>গ্রুপ: {data.groupName+" "}</Text>
             </View>
             
             <View style={{ alignItems: 'center', marginTop: 5, padding: 5, backgroundColor: '#f0f0f0', borderRadius: 4 }}>

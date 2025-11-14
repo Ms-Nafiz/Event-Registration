@@ -13,17 +13,39 @@ export default function RegistrationListPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Firebase থেকে ডেটা আনা
+        // ১. প্রথমে সব গ্রুপ নিয়ে আসুন (নাম ম্যাপ করার জন্য)
+        const groupsSnapshot = await getDocs(collection(db, "groups"));
+        const groupsMap = {};
+        groupsSnapshot.forEach((doc) => {
+          // ID কে key এবং Name কে value হিসেবে রাখা হলো
+          groupsMap[doc.id] = doc.data().name;
+        });
+        // ২. এবার রেজিস্ট্রেশন ডেটা আনুন
         const q = query(
           collection(db, "registrations"),
           orderBy("createdAt", "desc")
         );
         const querySnapshot = await getDocs(q);
 
-        const data = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const data = querySnapshot.docs.map((doc) => {
+          const docData = doc.data();
+
+          // গ্রুপের নাম বের করা (যদি ডেটায় সরাসরি না থাকে, তবে ID দিয়ে ম্যাপ থেকে বের করা)
+          const groupNameResolve =
+            docData.groupName || groupsMap[docData.group_id] || "N/A";
+
+          // সদস্য সংখ্যা ঠিক করা (বানান ভিন্ন হতে পারে তাই দুটি চেক করা)
+          const totalMemResolve =
+            docData.totalMembers || docData.total_members || 0;
+
+          return {
+            id: doc.id,
+            ...docData,
+            // আমরা ফিক্সড ভ্যালুগুলো এখানে সেট করে দিচ্ছি
+            finalGroupName: groupNameResolve,
+            finalTotalMembers: totalMemResolve,
+          };
+        });
 
         // প্রতিটি ডেটার জন্য QR কোড তৈরি করা (PDF এর জন্য)
         const dataWithQR = await Promise.all(
@@ -102,38 +124,27 @@ export default function RegistrationListPage() {
                   {/* Group */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <p className="text-sm text-gray-900">
-                      {reg.group?.name || "N/A"}
+                      {reg.finalGroupName || "N/A"}
                     </p>
                   </td>
 
                   {/* Mot Sodossho */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <p className="text-sm text-gray-900">
-                      {reg.total_members} জন
+                      {reg.finalTotalMembers} জন
                     </p>
                   </td>
 
-                  {/* === নতুন কলামের ডেটা === */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {/* Prothom sodossho (index 0) holo protinidhi, tai take bad diye baki-der dekhano hocche
-                     */}
+                  {/* অতিরিক্ত সদস্য তালিকা */}
+                  <td className="px-6 py-4 text-sm text-gray-600">
                     {reg.members && reg.members.length > 1 ? (
-                      <ul className="list-disc list-inside text-xs text-gray-600">
-                        {reg.members
-                          .filter((member, index) => index > 0) // Prothom sodossho (protinidhi) bad din
-                          .map((member) => (
-                            <li
-                              key={member.id}
-                              title={`Gender: ${member.gender}, T-Shirt: ${
-                                member.t_shirt_size || "N/A"
-                              }`}
-                            >
-                              {member.member_name}
-                            </li>
-                          ))}
+                      <ul className="list-disc list-inside">
+                        {reg.members.slice(1).map((m, i) => (
+                          <li key={i}>{m.member_name}</li>
+                        ))}
                       </ul>
                     ) : (
-                      <span className="text-xs text-gray-400">নেই</span>
+                      <span className="text-gray-400 text-xs">নেই</span>
                     )}
                   </td>
 
@@ -141,30 +152,67 @@ export default function RegistrationListPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        reg.payment_status === "Paid"
+                        reg.paymentStatus === "Paid"
                           ? "bg-green-100 text-green-800"
-                          : reg.payment_status === "Pending"
+                          : reg.paymentStatus === "Pending"
                           ? "bg-yellow-100 text-yellow-800"
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {reg.payment_status}
+                      {reg.paymentStatus}
                     </span>
                   </td>
 
                   {/* Action Button */}
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  {/* ডাউনলোড বাটন */}
+                  <td className="px-6 py-4 text-right">
                     <PDFDownloadLink
                       document={
                         <EntryCardDocument
-                          data={reg}
+                          data={{
+                            ...reg,
+                            groupName: reg.finalGroupName,
+                            totalMembers: reg.finalTotalMembers,
+                          }}
                           qrCodeUrl={reg.qrCodeUrl}
                         />
                       }
                       fileName={`card-${reg.id}.pdf`}
-                      className="text-blue-600 hover:underline"
                     >
-                      {({ loading }) => (loading ? "Loading..." : "Download")}
+                      {({ loading }) => (
+                        <button
+                          className={`
+          flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-semibold transition-colors duration-200 cursor-pointer
+          ${
+            loading
+              ? "border-gray-300 text-gray-400 bg-gray-50"
+              : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100"
+          }
+        `}
+                        >
+                          {loading ? (
+                            "লোডিং..."
+                          ) : (
+                            <>
+                              {/* ছোট পিডিএফ আইকন */}
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                ></path>
+                              </svg>
+                              PDF
+                            </>
+                          )}
+                        </button>
+                      )}
                     </PDFDownloadLink>
                   </td>
                 </tr>
