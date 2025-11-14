@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase'; // Firebase connection
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [recentRegistrations, setRecentRegistrations] = useState([]);
   const [groupStats, setGroupStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalViews, setTotalViews] = useState(0);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -101,6 +102,12 @@ export default function HomePage() {
         });
         setGroupStats(formattedGroupStats);
         setRecentRegistrations(recentWithNames);
+        const statsRef = doc(db, "stats", "page_views");
+        const statsSnap = await getDoc(statsRef);
+        
+        if (statsSnap.exists()) {
+            setTotalViews(statsSnap.data().count);
+        }
 
       } catch (error) {
         console.error(error);
@@ -121,6 +128,13 @@ export default function HomePage() {
     <div className="p-6 md:p-8 space-y-8 font-bangla">
       {/* --- স্ট্যাটাস কার্ড --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* --- নতুন ভিউ কাউন্টার কার্ড --- */}
+        <StatCard 
+          title="মোট লিংক ভিজিট" 
+          value={totalViews} 
+          icon="👁️" 
+          colorClass="border-purple-500" 
+        />
         <StatCard title="মোট রেজিস্ট্রেশন" value={stats?.total_registrations || 0} icon="📄" colorClass="border-blue-500" />
         <StatCard title="মোট সদস্য" value={stats?.total_members || 0} icon="👥" colorClass="border-indigo-500" />
         <StatCard title="পরিশোধিত" value={stats?.total_paid || 0} icon="✅" colorClass="border-green-500" />

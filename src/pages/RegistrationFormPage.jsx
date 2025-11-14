@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase"; // Firebase DB
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, getDoc, setDoc, increment } from 'firebase/firestore';
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { EntryCardDocument } from "../components/EntryCardPDF"; // PDF কম্পোনেন্ট
@@ -135,7 +135,40 @@ export default function RegistrationFormPage() {
             setLoading(false);
         }
     };
+// --- ২. ভিজিটর ট্র্যাকিং এফেক্ট ---
+    useEffect(() => {
+        const trackVisit = async () => {
+            // চেক করি এই সেশনে ইউজার ইতিমধ্যে ভিজিট করেছে কিনা
+            const hasVisited = sessionStorage.getItem('hasVisited');
 
+            if (!hasVisited) {
+                try {
+                    const statsRef = doc(db, "stats", "page_views");
+                    const docSnap = await getDoc(statsRef);
+
+                    if (docSnap.exists()) {
+                        // ডকুমেন্ট থাকলে ১ বাড়ান
+                        await updateDoc(statsRef, {
+                            count: increment(1)
+                        });
+                    } else {
+                        // ডকুমেন্ট না থাকলে তৈরি করুন (প্রথম ভিজিট)
+                        await setDoc(statsRef, {
+                            count: 1
+                        });
+                    }
+                    
+                    // ব্রাউজারে মার্ক করে রাখা যে ভিজিট কাউন্ট হয়েছে
+                    sessionStorage.setItem('hasVisited', 'true');
+                    
+                } catch (error) {
+                    console.error("Tracking Error:", error);
+                }
+            }
+        };
+
+        trackVisit();
+    }, []);
   return (
     <div className="max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl font-bangla">
       <h2 className="text-3xl font-bold text-gray-800 border-b pb-4 mb-6 text-center">
