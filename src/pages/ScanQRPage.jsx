@@ -142,12 +142,22 @@ export default function ScanQRPage() {
       <div className="mt-6">
         <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি (নতুনটি উপরে):</h3>
         <div className="bg-white shadow rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-          {/* ... তালিকা এখানে ... */}
-          {enteredList.map((user) => (
-             <li key={user.id} className="p-3 list-none flex justify-between items-center border-b">
-                {/* ... */}
-             </li>
-          ))}
+            <ul className="divide-y divide-gray-200">
+                {enteredList.map((user) => (
+                    <li key={user.id} className="p-3 flex justify-between items-center">
+                        <div>
+                            <p className="font-bold text-gray-800">{user.name}</p>
+                            <p className="text-xs text-gray-500">ID: {user.id}</p>
+                        </div>
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">
+                            +{user.totalMembers} জন
+                        </span>
+                    </li>
+                ))}
+                {enteredList.length === 0 && (
+                    <li className="p-4 text-center text-gray-500">এখনও কেউ প্রবেশ করেনি।</li>
+                )}
+            </ul>
         </div>
       </div>
     </div>
