@@ -13,6 +13,8 @@ export default function ScanQRPage() {
 
   // স্ক্যানার অবজেক্টকে রেফারেন্সে রাখা (এটি রিরেন্ডার হলেও টিকে থাকবে)
   const scannerRef = useRef(null); 
+  // স্ক্যানার যে div এ রেন্ডার হবে তার ID
+  const scannerRegionId = "qr-reader"; 
 
   // --- ১. রিয়েল-টাইম এন্ট্রি লিস্ট (ইনডেক্স সহ) ---
   useEffect(() => {
@@ -44,13 +46,15 @@ export default function ScanQRPage() {
     // শুধুমাত্র যদি স্ক্যানার আগে তৈরি না হয়ে থাকে
     if (!scannerRef.current) { 
       const html5QrcodeScanner = new Html5QrcodeScanner(
-        'qr-reader', { qrbox: { width: 250, height: 250 }, fps: 10, rememberLastUsedCamera: true }, false
+        scannerRegionId, 
+        { qrbox: { width: 250, height: 250 }, fps: 10, rememberLastUsedCamera: true }, 
+        false
       );
 
       const onScanSuccess = (decodedText) => {
         // যদি একটি স্ক্যান প্রসেসিং অবস্থায় থাকে (loading = true), তবে নতুন স্ক্যান নেব না
-        // এই চেকটি এখন handleScanResult এ করা হবে
-        
+        if (loading) return; 
+
         // স্ক্যানার পজ করুন (ref ব্যবহার করে)
         if(scannerRef.current) {
             scannerRef.current.pause(true);
@@ -120,7 +124,7 @@ export default function ScanQRPage() {
       <div className="bg-gray-100 rounded-xl overflow-hidden shadow-2xl border-4 border-indigo-500 relative">
         
         {/* এই div-এর ভেতরে স্ক্যানারটি লোড হবে */}
-        <div id="qr-reader" className={`w-full ${isPaused ? 'hidden' : 'block'}`}></div> 
+        <div id={scannerRegionId} className={`w-full ${isPaused ? 'hidden' : 'block'}`}></div> 
 
         {/* --- পজড (Paused) মেসেজ --- */}
         {isPaused && (
