@@ -52,7 +52,7 @@ export default function ScanQRPage() {
       handleScanResult(decodedText); // ফায়ারবেস লজিক কল করুন
     };
 
-    scanner.render(onScanSuccess, (error) => {});
+    html5QrcodeScanner.render(onScanSuccess, (error) => {});
 
     // কম্পোনেন্টটি বন্ধ হলে ক্যামেরা রিলিজ করুন
     return () => {
