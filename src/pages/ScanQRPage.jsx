@@ -15,7 +15,7 @@ export default function ScanQRPage() {
     const q = query(
       collection(db, "registrations"),
       where("checkedIn", "==", true),
-      orderBy("checkInTime", "desc") // Firebase-এ এই ইনডেক্সটি তৈরি করতে হতে পারে
+      //orderBy("checkInTime", "desc") Firebase-এ এই ইনডেক্সটি তৈরি করতে হতে পারে
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
