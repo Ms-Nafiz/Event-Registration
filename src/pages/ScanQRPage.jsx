@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // <-- useRef ইম্পোর্ট করুন
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
@@ -7,15 +7,19 @@ import toast from 'react-hot-toast';
 export default function ScanQRPage() {
   const [enteredList, setEnteredList] = useState([]);
   const [totalEntered, setTotalEntered] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // শুধু লোডিং UI-এর জন্য
   const [scanResult, setScanResult] = useState(null);
 
-  // --- ১. রিয়েল-টাইম এন্ট্রি লিস্ট (ইনডেক্স তৈরির পর এটি কাজ করবে) ---
+  // --- ১. স্ক্যানার ইনস্ট্যান্স এবং স্ক্যানিং স্ট্যাটাস ধরে রাখার জন্য Ref ---
+  const scannerRef = useRef(null);
+  const isScanningRef = useRef(true); // এটি true থাকা মানে স্ক্যানার চালু আছে
+
+  // --- ২. রিয়েল-টাইম লিস্ট (ইনডেক্স তৈরি করা আছে ধরে নিচ্ছি) ---
   useEffect(() => {
     const q = query(
       collection(db, "registrations"),
       where("checkedIn", "==", true),
-      orderBy("checkInTime", "desc") // <-- নতুন এন্ট্রি উপরে দেখানোর জন্য
+      orderBy("checkInTime", "desc")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -30,40 +34,49 @@ export default function ScanQRPage() {
     (error) => {
       // এই এররটি কনসোলে দেখাবে যদি ইনডেক্স তৈরি না হয়
       console.error("Firestore query error:", error);
-      toast.error("ইনডেক্স তৈরি করা প্রয়োজন। কনসোল চেক করুন।");
+      toast.error("তালিকা লোড করতে ইনডেক্স প্রয়োজন। ব্রাউজার কনসোল চেক করুন।");
     });
 
     return () => unsubscribe();
   }, []);
 
-  // --- ২. QR স্ক্যানার চালু করা ---
+  // --- ৩. QR স্ক্যানার চালু করা (শুধু একবার পেজ লোড হলে) ---
   useEffect(() => {
+    // এই ফাংশনটি শুধু একবারই রান করবে
     const scanner = new Html5QrcodeScanner(
       'qr-reader', { qrbox: { width: 250, height: 250 }, fps: 10, rememberLastUsedCamera: true }, false
     );
-
-    let isScanning = true;
+    
+    // ইনস্ট্যান্সটি Ref-এ সেভ করুন যাতে পরে ব্যবহার করা যায়
+    scannerRef.current = scanner; 
 
     const onScanSuccess = (decodedText) => {
-      if (!isScanning) return; 
+      // যদি isScanningRef false হয় (অর্থাৎ ইতিমধ্যে প্রসেসিং চলছে), তবে নতুন স্ক্যান ইগনোর করুন
+      if (!isScanningRef.current) return; 
 
-      isScanning = false; 
-      scanner.pause(true); 
-      setLoading(true);
-      setScanResult(decodedText); 
-      handleScanResult(decodedText); 
+      isScanningRef.current = false; // স্ক্যানিং বন্ধ করুন
+      setLoading(true); // লোডিং UI দেখান
+      setScanResult(decodedText);
+      
+      // Ref থেকে ইনস্ট্যান্স নিয়ে পজ করুন
+      if (scannerRef.current) {
+        scannerRef.current.pause(true);
+      }
+      
+      handleScanResult(decodedText); // ফায়ারবেস লজিক কল করুন
     };
 
     scanner.render(onScanSuccess, (error) => {});
 
+    // কম্পোনেন্টটি আনমাউন্ট হলে (পেজ ত্যাগ করলে)
     return () => {
-      if (scanner) {
-        scanner.clear().catch(error => console.error("Scanner clear failed.", error));
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(error => console.error("Scanner clear failed.", error));
       }
     };
   }, []); // [] খালি রাখা নিশ্চিত করুন
 
-  // --- ৩. ফায়ারবেস লজিক ---
+  // --- ৪. ফায়ারবেস লজিক (স্ক্যান সফল হওয়ার পর) ---
   const handleScanResult = async (scannedId) => {
     try {
       const q = query(collection(db, "registrations"), where("id", "==", scannedId));
@@ -71,47 +84,40 @@ export default function ScanQRPage() {
 
       if (querySnapshot.empty) {
         toast.error('❌ ভুল QR কোড! রেজিস্ট্রেশন পাওয়া যায়নি।');
-        resumeScan(); // <-- 'finally' তে না রেখে এখানে কল করুন
-        return;
-      }
-
-      const docData = querySnapshot.docs[0];
-      const regData = docData.data();
-      const docRef = doc(db, "registrations", docData.id);
-
-      if (regData.checkedIn) {
-        toast.error(`⚠️ ${regData.name} (${regData.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
       } else {
-        await updateDoc(docRef, {
-          checkedIn: true,
-          checkInTime: new Date()
-        });
-        toast.success(`✅ স্বাগতম ${regData.name}! (${regData.totalMembers} জন)`);
-      }
-      
-      resumeScan(); // <-- সফল বা ব্যর্থ উভয় ক্ষেত্রেই এখানে কল করুন
+        const docData = querySnapshot.docs[0];
+        const regData = docData.data();
+        const docRef = doc(db, "registrations", docData.id);
 
+        if (regData.checkedIn) {
+          toast.error(`⚠️ ${regData.name} (${regData.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
+        } else {
+          // --- এন্ট্রি কনফার্ম করা ---
+          await updateDoc(docRef, {
+            checkedIn: true,
+            checkInTime: new Date()
+          });
+          toast.success(`✅ স্বাগতম ${regData.name}! (${regData.totalMembers} জন)`);
+        }
+      }
     } catch (err) {
       console.error(err);
       toast.error('স্ক্যানিং এ সমস্যা হয়েছে।');
-      resumeScan(); // <-- এরর হলেও স্ক্যানার চালু করুন
-    } 
-    // `finally` ব্লকটি বাদ দেওয়া হলো কারণ `resumeScan` এখন সব কন্ডিশনে কল হচ্ছে
+    } finally {
+      // --- ৫. স্ক্যানার আবার চালু করা (সবচেয়ে গুরুত্বপূর্ণ) ---
+      // সফল হোক বা ব্যর্থ, ৩ সেকেন্ড পর স্ক্যানার আবার চালু হবে
+      setTimeout(() => {
+        if (scannerRef.current && scannerRef.current.getState() === "PAUSED") {
+          scannerRef.current.resume();
+        }
+        isScanningRef.current = true; // স্ক্যানিং আবার চালু
+        setLoading(false); // <-- লোডিং UI বন্ধ করুন
+        setScanResult('আবার স্ক্যান করুন...');
+      }, 3000); // ৩ সেকেন্ড পর
+    }
   };
 
-  // স্ক্যানার আবার চালু করার ফাংশন
-  const resumeScan = () => {
-    setTimeout(() => {
-      const scanner = Html5QrcodeScanner.getScanner("qr-reader");
-      if (scanner && scanner.getState() === "PAUSED") {
-          scanner.resume();
-      }
-      setLoading(false); // <-- লোডার এখানে বন্ধ করুন
-      setScanResult('আবার স্ক্যান করুন...');
-      // isScanning = true; // এটি onScanSuccess-এ সেট করা আছে, তবে এখানেও করা যেতে পারে
-    }, 3000); 
-  };
-
+  // --- ৬. JSX (Return) ---
   return (
     <div className="p-4 font-bangla max-w-md mx-auto">
       <h2 className="text-2xl font-bold text-center mb-4 text-indigo-700">📲 এন্ট্রি স্ক্যানার</h2>
@@ -130,7 +136,7 @@ export default function ScanQRPage() {
           </div>
         )}
         
-        {scanResult && !loading && ( // শুধু লোডিং শেষ হলে রেজাল্ট দেখান
+        {scanResult && !loading && (
           <div className="bg-white p-2 text-center font-bold text-gray-800">
             {scanResult}
           </div>
