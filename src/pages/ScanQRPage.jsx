@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode'; // Html5Qrcode ইম্পোর্ট করুন
+import { useState, useEffect, useRef } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -9,56 +9,70 @@ export default function ScanQRPage() {
   const [totalEntered, setTotalEntered] = useState(0);
   const [loading, setLoading] = useState(false); // "যাচাই করা হচ্ছে"
   const [scanResult, setScanResult] = useState(null);
-  
-  // --- নতুন স্টেট ---
-  // স্ক্যানারটি পজড (Paused) অবস্থায় আছে কিনা তা ট্র্যাক করার জন্য
-  const [isPaused, setIsPaused] = useState(false); 
+  const [isPaused, setIsPaused] = useState(false); // স্ক্যানার পজড কিনা
+
+  // স্ক্যানার অবজেক্টকে রেফারেন্সে রাখা (এটি রিরেন্ডার হলেও টিকে থাকবে)
+  const scannerRef = useRef(null); 
 
   // --- ১. রিয়েল-টাইম এন্ট্রি লিস্ট (ইনডেক্স সহ) ---
   useEffect(() => {
     const q = query(
       collection(db, "registrations"),
       where("checkedIn", "==", true),
-      orderBy("checkInTime", "desc") // নতুন এন্ট্রি উপরে দেখানোর জন্য
+      orderBy("checkInTime", "desc") // নতুন এন্ট্রি উপরে
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
       let totalPeople = 0;
       list.forEach(item => totalPeople += parseInt(item.totalMembers || 0));
-      setEnteredList(list);
-      setTotalEntered(totalPeople);
-    }, (error) => {
+      
+      setEnteredList(list); // <-- তালিকা আপডেট
+      setTotalEntered(totalPeople); // <-- মোট সংখ্যা আপডেট
+    }, 
+    (error) => {
       console.error("Firestore query error (Index needed?):", error);
-      toast.error("লাইভ তালিকা লোড করা যায়নি।");
+      toast.error("তালিকা লোড করা যায়নি। Firebase Console চেক করুন।");
     });
 
     return () => unsubscribe();
-  }, []);
+  }, []); // [] খালি রাখা নিশ্চিত করুন (শুধু একবার চলবে)
 
   // --- ২. QR স্ক্যানার চালু করা ---
   useEffect(() => {
-    // স্ক্যানার অবজেক্টটি এই কম্পোনেন্টের বাইরে তৈরি করা হলো যাতে state আপডেটে রেন্ডার না হয়
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      'qr-reader', { qrbox: { width: 250, height: 250 }, fps: 10, rememberLastUsedCamera: true }, false
-    );
+    // শুধুমাত্র যদি স্ক্যানার আগে তৈরি না হয়ে থাকে
+    if (!scannerRef.current) { 
+      const html5QrcodeScanner = new Html5QrcodeScanner(
+        'qr-reader', { qrbox: { width: 250, height: 250 }, fps: 10, rememberLastUsedCamera: true }, false
+      );
 
-    const onScanSuccess = (decodedText) => {
-      // স্ক্যানার পজ করুন এবং স্টেট আপডেট করুন
-      html5QrcodeScanner.pause(true);
-      setIsPaused(true);
-      setLoading(true);
-      setScanResult(decodedText);
-      handleScanResult(decodedText); // ফায়ারবেস লজিক কল করুন
-    };
+      const onScanSuccess = (decodedText) => {
+        // যদি একটি স্ক্যান প্রসেসিং অবস্থায় থাকে (loading = true), তবে নতুন স্ক্যান নেব না
+        // এই চেকটি এখন handleScanResult এ করা হবে
+        
+        // স্ক্যানার পজ করুন (ref ব্যবহার করে)
+        if(scannerRef.current) {
+            scannerRef.current.pause(true);
+        }
+        setIsPaused(true); 
+        setLoading(true); // "যাচাই করা হচ্ছে..." চালু
+        setScanResult(decodedText);
+        handleScanResult(decodedText); // ফায়ারবেস লজিক কল করুন
+      };
 
-    html5QrcodeScanner.render(onScanSuccess, (error) => {});
+      html5QrcodeScanner.render(onScanSuccess, (error) => {});
+      scannerRef.current = html5QrcodeScanner; // রেফারেন্সে সেভ করুন
+    }
 
     // কম্পোনেন্টটি বন্ধ হলে ক্যামেরা রিলিজ করুন
     return () => {
-      html5QrcodeScanner.clear().catch(error => console.error("Scanner clear failed.", error));
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(error => console.error("Scanner clear failed.", error));
+        scannerRef.current = null;
+      }
     };
-  }, []); // [] খালি রাখা নিশ্চিত করুন
+  }, []); // <-- এই খালি অ্যারেটি [ ] খুবই গুরুত্বপূর্ণ, এটিই বাগ ফিক্স করে
 
   // --- ৩. ফায়ারবেস লজিক ---
   const handleScanResult = async (scannedId) => {
@@ -83,15 +97,16 @@ export default function ScanQRPage() {
     } catch (err) {
       toast.error('স্ক্যানিং এ সমস্যা হয়েছে।');
     } finally {
-      setLoading(false); // "যাচাই করা হচ্ছে" লোডার বন্ধ করুন
+      // লোডার বন্ধ করুন, কিন্তু স্ক্যানার পজড রাখুন
+      setLoading(false); 
     }
   };
 
-  // --- ৪. নতুন বাটন ক্লিক হ্যান্ডেলার ---
+  // --- ৪. "আবার স্ক্যান করুন" বাটন ক্লিক হ্যান্ডেলার ---
   const handleResumeClick = () => {
-    const scanner = Html5QrcodeScanner.getScanner("qr-reader");
-    if (scanner && scanner.getState() === "PAUSED") {
-        scanner.resume();
+    // ref থেকে স্ক্যানারটি খুঁজে বের করুন
+    if (scannerRef.current && scannerRef.current.getState() === "PAUSED") {
+        scannerRef.current.resume();
     }
     setIsPaused(false); // পজড স্টেট false করুন
     setScanResult(null); // রেজাল্ট মেসেজ ক্লিয়ার করুন
@@ -112,17 +127,20 @@ export default function ScanQRPage() {
           <div className="w-full h-[300px] flex flex-col items-center justify-center bg-gray-800 text-white p-4">
             {loading ? (
               <>
-                <svg className="animate-spin h-8 w-8 text-white mb-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w_...svg">...</svg>
+                <svg className="animate-spin h-8 w-8 text-white mb-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 <p className="text-lg">যাচাই করা হচ্ছে...</p>
                 <p className="text-sm">রেজাল্ট: {scanResult}</p>
               </>
             ) : (
               <>
-                <p className="text-lg mb-4">স্ক্যান সম্পন্ন। রেজাল্ট: {scanResult}</p>
+                <p className="text-lg mb-4 text-center">স্ক্যান সম্পন্ন। <br/> রেজাল্ট: {scanResult}</p>
                 {/* --- আসল বাটন --- */}
                 <button
                   onClick={handleResumeClick}
-                  className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700"
+                  className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 active:bg-indigo-800"
                 >
                   আবার স্ক্যান করুন
                 </button>
@@ -132,19 +150,19 @@ export default function ScanQRPage() {
         )}
       </div>
 
-      {/* --- পরিসংখ্যান (আগের মতোই) --- */}
+      {/* --- পরিসংখ্যান --- */}
       <div className="mt-6 bg-green-100 p-4 rounded-lg border border-green-400 text-center">
         <h3 className="text-xl font-bold text-green-800">মোট প্রবেশ করেছে</h3>
         <p className="text-4xl font-bold text-green-600">{totalEntered} জন</p>
       </div>
 
-      {/* --- যারা প্রবেশ করেছে তাদের তালিকা (আগের মতোই) --- */}
+      {/* --- যারা প্রবেশ করেছে তাদের তালিকা --- */}
       <div className="mt-6">
         <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি (নতুনটি উপরে):</h3>
         <div className="bg-white shadow rounded-lg overflow-hidden max-h-60 overflow-y-auto">
             <ul className="divide-y divide-gray-200">
-                {enteredList.map((user) => (
-                    <li key={user.id} className="p-3 flex justify-between items-center">
+                {enteredList.length > 0 ? enteredList.map((user) => (
+                    <li key={user.id} className="p-3 list-none flex justify-between items-center border-b">
                         <div>
                             <p className="font-bold text-gray-800">{user.name}</p>
                             <p className="text-xs text-gray-500">ID: {user.id}</p>
@@ -153,9 +171,8 @@ export default function ScanQRPage() {
                             +{user.totalMembers} জন
                         </span>
                     </li>
-                ))}
-                {enteredList.length === 0 && (
-                    <li className="p-4 text-center text-gray-500">এখনও কেউ প্রবেশ করেনি।</li>
+                )) : (
+                    <li className="p-4 text-center text-gray-500 list-none">এখনও কেউ প্রবেশ করেনি।</li>
                 )}
             </ul>
         </div>
