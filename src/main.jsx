@@ -14,6 +14,7 @@ import AdminRegister from './components/Register'; // Register কে নতু�
 import VerifyEmail from './pages/VerifyEmail';
 import GroupsPage from './pages/GroupsPage'; // <-- নতুন ইম্পোর্ট
 import ProfilePage from './pages/ProfilePage'; // <-- নতুন ইম্পোর্ট
+import ScanQRPage from './pages/ScanQRPage';
 
 // --- পাবলিক পেজ ---
 import PublicEventRegistration from './pages/RegistrationFormPage'; // এই পেজটিই আমরা পাবলিক করবো
@@ -46,6 +47,7 @@ function AppRouter() {
                     <Route path="/create-entry" element={<PublicEventRegistration />} /> 
                     <Route path="/groups" element={<GroupsPage />} /> {/* <-- নতুন রুট */}
                     <Route path="/profile" element={<ProfilePage />} /> {/* <-- নতুন রুট */}
+                    <Route path="/scan" element={<ScanQRPage />} />
                 </Routes>
             </DashboardLayout>
         </ProtectedRoute>

@@ -1,55 +1,69 @@
-// src/pages/ProfilePage.jsx
 import { useState } from 'react';
-import api from '../api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext'; // AuthContext আপডেট করতে হবে
+import { updateProfile, updatePassword } from "firebase/auth";
+import { auth } from '../firebase'; // Firebase auth ইম্পোর্ট
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
-  const { user, authLoading } = useAuth(); // AuthContext থেকে ইউজার তথ্য
+  const { user } = useAuth(); // AuthContext থেকে বর্তমান ইউজার নিন
 
   // প্রোফাইল ফর্ম স্টেট
-  const [profileForm, setProfileForm] = useState({
-    name: user.name,
-    email: user.email,
-  });
+  const [name, setName] = useState(user.displayName || '');
+  const [email, setEmail] = useState(user.email || ''); // ইমেইল শুধু দেখানোর জন্য
   
   // পাসওয়ার্ড ফর্ম স্টেট
-  const [passwordForm, setPasswordForm] = useState({
-    current_password: '',
-    password: '',
-    password_confirmation: '',
-  });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleProfileChange = (e) => {
-    setProfileForm({ ...profileForm, [e.target.name]: e.target.value });
-  };
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
 
-  const handlePasswordChange = (e) => {
-    setPasswordForm({ ...passwordForm, [e.target.name]: e.target.value });
-  };
-
-  // প্রোফাইল সাবমিট
+  // প্রোফাইল (নাম) সাবমিট
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    if (name === user.displayName) return; // যদি নাম পরিবর্তন না হয়
+
+    setLoadingProfile(true);
     try {
-      const response = await api.put('/user/profile-information', profileForm);
-      toast.success(response.data.message, { className: 'font-bangla' });
-      // (ঐচ্ছিক: AuthContext-এ ইউজার তথ্য আপডেট করা)
+      await updateProfile(auth.currentUser, {
+        displayName: name
+      });
+      toast.success('প্রোফাইলের নাম আপডেট করা হয়েছে!');
+      // (AuthContext স্বয়ংক্রিয়ভাবে আপডেট হয়ে যাবে)
     } catch (error) {
-      toast.error('প্রোফাইল আপডেট করা যায়নি।', { className: 'font-bangla' });
+      toast.error('প্রোফাইল আপডেট করা যায়নি।');
+      console.error(error);
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   // পাসওয়ার্ড সাবমিট
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      return toast.error('পাসওয়ার্ড দুটি মিলছে না!');
+    }
+    if (newPassword.length < 6) {
+      return toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+    }
+
+    setLoadingPassword(true);
     try {
-      const response = await api.put('/user/password', passwordForm);
-      toast.success(response.data.message, { className: 'font-bangla' });
-      setPasswordForm({ current_password: '', password: '', password_confirmation: '' });
+      await updatePassword(auth.currentUser, newPassword);
+      toast.success('পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
-      const errorMsg = error.response?.data?.errors?.current_password?.[0] || 'পাসওয়ার্ড পরিবর্তন করা যায়নি।';
-      toast.error(errorMsg, { className: 'font-bangla' });
+      // যদি ইউজার অনেক আগে লগইন করে থাকে, তবে ফায়ারবেস নিরাপত্তার জন্য আবার লগইন করতে বলবে
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error('এটি একটি সংবেদনশীল কাজ। অনুগ্রহ করে লগআউট করে আবার লগইন করুন।');
+      } else {
+        toast.error('পাসওয়ার্ড পরিবর্তন করা যায়নি।');
+      }
+      console.error(error);
+    } finally {
+      setLoadingPassword(false);
     }
   };
 
@@ -66,8 +80,8 @@ export default function ProfilePage() {
             <input
               type="text"
               name="name"
-              value={profileForm.name}
-              onChange={handleProfileChange}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
             />
           </div>
@@ -76,14 +90,18 @@ export default function ProfilePage() {
             <input
               type="email"
               name="email"
-              value={profileForm.email}
-              onChange={handleProfileChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+              value={email}
+              disabled // ফায়ারবেসে ইমেইল পরিবর্তন করা জটিল, তাই ডিসেবল রাখা হলো
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 bg-gray-100 cursor-not-allowed"
             />
           </div>
           <div className="text-right">
-            <button type="submit" disabled={authLoading} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              সেভ করুন
+            <button 
+              type="submit" 
+              disabled={loadingProfile} 
+              className={`px-5 py-2 rounded-lg text-white ${loadingProfile ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            >
+              {loadingProfile ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
             </button>
           </div>
         </form>
@@ -94,22 +112,12 @@ export default function ProfilePage() {
         <h3 className="text-xl font-semibold mb-4 border-b pb-2">পাসওয়ার্ড পরিবর্তন</h3>
         <form onSubmit={handlePasswordSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">বর্তমান পাসওয়ার্ড</label>
-            <input
-              type="password"
-              name="current_password"
-              value={passwordForm.current_password}
-              onChange={handlePasswordChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700">নতুন পাসওয়ার্ড</label>
             <input
               type="password"
               name="password"
-              value={passwordForm.password}
-              onChange={handlePasswordChange}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
             />
           </div>
@@ -118,14 +126,18 @@ export default function ProfilePage() {
             <input
               type="password"
               name="password_confirmation"
-              value={passwordForm.password_confirmation}
-              onChange={handlePasswordChange}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
             />
           </div>
           <div className="text-right">
-            <button type="submit" disabled={authLoading} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              পাসওয়ার্ড সেভ করুন
+            <button 
+              type="submit" 
+              disabled={loadingPassword} 
+              className={`px-5 py-2 rounded-lg text-white ${loadingPassword ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            >
+              {loadingPassword ? 'সেভ হচ্ছে...' : 'পাসওয়ার্ড সেভ করুন'}
             </button>
           </div>
         </form>
