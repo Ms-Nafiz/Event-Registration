@@ -260,8 +260,10 @@
 
 // ScanQRPage.jsx  ← পুরোটা এই কোড দিয়ে রিপ্লেস কর
 
+// ScanQRPage.jsx  ← পুরোটা এই কোড দিয়ে রিপ্লেস কর (আগের সবকিছু একই রেখে)
+
 import React, { useState, useEffect } from 'react';
-import { QrReader } from '@yudiel/react-qr-scanner';
+import QrScanner from '@yudiel/react-qr-scanner';  // ← এখানে default import (QrScanner)
 import { db } from '../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -303,33 +305,34 @@ export default function ScanQRPage() {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        toast.error('ভুল QR কোড!');
+        toast.error('❌ ভুল QR কোড! রেজিস্ট্রেশন পাওয়া যায়নি।');
       } else {
         const docData = snap.docs[0];
         const data = docData.data();
         const ref = doc(db, "registrations", docData.id);
 
         if (data.checkedIn) {
-          toast.error(`⚠️ ${data.name} ইতিমধ্যে প্রবেশ করেছেন!`);
+          toast.error(`⚠️ ${data.name} (${data.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
         } else {
           await updateDoc(ref, { checkedIn: true, checkInTime: new Date() });
-          toast.success(`স্বাগতম ${data.name}! (+${data.totalMembers} জন)`);
+          toast.success(`✅ স্বাগতম ${data.name}! (${data.totalMembers} জন)`);
         }
       }
     } catch (err) {
-      toast.error('সমস্যা হয়েছে');
+      console.error(err);
+      toast.error('স্ক্যানিং এ সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
 
-      // ২.৩ সেকেন্ড পর অটো আবার চালু
+      // ২.৫ সেকেন্ড পর অটো আবার চালু
       setTimeout(() => {
         setIsPaused(false);
         setScanResult(null);
-      }, 2300);
+      }, 2500);
     }
   };
 
-  // ম্যানুয়াল রিজিউম (যদি কেউ তাড়াতাড়ি চাপে)
+  // ম্যানুয়াল রিজিউম
   const resumeNow = () => {
     setIsPaused(false);
     setScanResult(null);
@@ -338,36 +341,36 @@ export default function ScanQRPage() {
 
   return (
     <div className="p-4 font-bangla max-w-md mx-auto">
-      <h2 className="text-2xl font-bold text-center mb-4 text-indigo-700">এন্ট্রি স্ক্যানার</h2>
+      <h2 className="text-2xl font-bold text-center mb-4 text-indigo-700">📲 এন্ট্রি স্ক্যানার</h2>
 
       <div className="bg-gray-100 rounded-xl overflow-hidden shadow-2xl border-4 border-indigo-500 relative">
         <div className={isPaused ? 'hidden' : 'block'}>
-          <QrReader
+          <QrScanner  // ← এখানে QrScanner ইউজ কর
             onResult={handleScan}
             constraints={{ facingMode: 'environment' }}
-            scanDelay={300}
+            scanDelay={300}  // duplicate avoid
             style={{ width: '100%' }}
           />
         </div>
 
-        {/* পজ ওভারলে */}
+        {/* পজড ওভারলে (তোর আগের স্টাইল একই) */}
         {isPaused && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-95 text-white">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 text-white p-4">
             {loading ? (
               <>
-                <svg className="animate-spin h-12 w-12 mb-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg className="animate-spin h-8 w-8 text-white mb-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p className="text-xl">যাচাই করা হচ্ছে...</p>
-                <p className="text-sm mt-2">ID: {scanResult}</p>
+                <p className="text-lg">যাচাই করা হচ্ছে...</p>
+                <p className="text-sm">রেজাল্ট: {scanResult}</p>
               </>
             ) : (
               <>
-                <p className="text-lg mb-6 text-center">স্ক্যান হয়েছে<br />ID: {scanResult}</p>
+                <p className="text-lg mb-4 text-center">স্ক্যান সম্পন্ন। <br/> রেজাল্ট: {scanResult}</p>
                 <button
                   onClick={resumeNow}
-                  className="px-8 py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700"
+                  className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 active:bg-indigo-800"
                 >
                   আবার স্ক্যান করুন
                 </button>
@@ -377,31 +380,31 @@ export default function ScanQRPage() {
         )}
       </div>
 
+      {/* পরিসংখ্যান */}
       <div className="mt-6 bg-green-100 p-4 rounded-lg border border-green-400 text-center">
         <h3 className="text-xl font-bold text-green-800">মোট প্রবেশ করেছে</h3>
-        <p className="text-5xl font-bold text-green-600">{totalEntered} জন</p>
+        <p className="text-4xl font-bold text-green-600">{totalEntered} জন</p>
       </div>
 
+      {/* লিস্ট */}
       <div className="mt-6">
-        <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি:</h3>
-        <div className="bg-white rounded-lg shadow max-h-64 overflow-y-auto">
-          {enteredList.length === 0 ? (
-            <p className="p-4 text-center text-gray-500">কেউ আসেনি এখনো</p>
-          ) : (
-            <ul className="divide-y divide-gray-200">
-              {enteredList.map(user => (
-                <li key={user.id} className="p-4 flex justify-between">
-                  <div>
-                    <p className="font-bold">{user.name}</p>
-                    <p className="text-xs text-gray-500">ID: {user.id}</p>
-                  </div>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold">
-                    +{user.totalMembers} জন
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+        <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি (নতুনটি উপরে):</h3>
+        <div className="bg-white shadow rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+          <ul className="divide-y divide-gray-200">
+            {enteredList.length > 0 ? enteredList.map((user) => (
+              <li key={user.id} className="p-3 list-none flex justify-between items-center border-b">
+                <div>
+                  <p className="font-bold text-gray-800">{user.name}</p>
+                  <p className="text-xs text-gray-500">ID: {user.id}</p>
+                </div>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">
+                  +{user.totalMembers} জন
+                </span>
+              </li>
+            )) : (
+              <li className="p-4 text-center text-gray-500 list-none">এখনও কেউ প্রবেশ করেনি।</li>
+            )}
+          </ul>
         </div>
       </div>
     </div>
