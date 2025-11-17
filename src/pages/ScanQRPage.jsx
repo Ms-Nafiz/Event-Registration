@@ -258,8 +258,10 @@
 
 // ScanQRPage.jsx  (পুরো ফাইলটা এই কোড দিয়ে রিপ্লেস কর)
 
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+// ScanQRPage.jsx  ← পুরোটা এই কোড দিয়ে রিপ্লেস কর
+
+import React, { useState, useEffect } from 'react';
+import { QrReader } from '@yudiel/react-qr-scanner';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -271,12 +273,6 @@ export default function ScanQRPage() {
   const [scanResult, setScanResult] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  const videoRef = useRef(null);
-  const codeReaderRef = useRef(null);
-  const requestRef = useRef(null);
-  const lastScanned = useRef('');
-  const lastTime = useRef(0);
-
   // রিয়েলটাইম লিস্ট
   useEffect(() => {
     const q = query(
@@ -284,126 +280,56 @@ export default function ScanQRPage() {
       where("checkedIn", "==", true),
       orderBy("checkInTime", "desc")
     );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       let total = 0;
-      list.forEach(item => total += Number(item.totalMembers || 0));
+      list.forEach(i => total += Number(i.totalMembers || 0));
       setEnteredList(list);
       setTotalEntered(total);
-    }, (err) => {
-      console.error(err);
-      toast.error("লিস্ট লোড করা যায়নি");
     });
-
     return () => unsubscribe();
   }, []);
 
-  // ZXing স্ক্যানার চালু
-  useEffect(() => {
-    const codeReader = new BrowserMultiFormatReader();
-    codeReaderRef.current = codeReader;
+  const handleScan = async (result) => {
+    if (!result || loading) return;
+    const text = result?.text;
 
-    const startCameraAndScan = async () => {
-      if (!videoRef.current) return;
+    setIsPaused(true);
+    setLoading(true);
+    setScanResult(text);
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
-
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-
-        const tick = () => {
-          if (!videoRef.current || isPaused || loading) {
-            requestRef.current = requestAnimationFrame(tick);
-            return;
-          }
-
-          codeReader.decodeFromVideoElement(videoRef.current, (result, error) => {
-            if (result) {
-              const text = result.getText();
-              const now = Date.now();
-
-              // একই QR বারবার না আসে
-              if (text === lastScanned.current && now - lastTime.current < 2000) {
-                requestRef.current = requestAnimationFrame(tick);
-                return;
-              }
-
-              lastScanned.current = text;
-              lastTime.current = now;
-
-              setIsPaused(true);
-              setLoading(true);
-              setScanResult(text);
-              handleScanResult(text);
-
-              // ২.৫ সেকেন্ড পর অটো আবার চালু
-              setTimeout(() => {
-                setIsPaused(false);
-                setScanResult(null);
-                setLoading(false);
-              }, 2500);
-            }
-
-            if (error && !(error instanceof NotFoundException)) {
-              console.warn(error);
-            }
-
-            requestRef.current = requestAnimationFrame(tick);
-          });
-        };
-
-        tick();
-
-      } catch (err) {
-        toast.error("ক্যামেরা চালু করতে সমস্যা হয়েছে। অনুমতি দিন।");
-      }
-    };
-
-    startCameraAndScan();
-
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      codeReader.reset();
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  // ফায়ারবেস চেক
-  const handleScanResult = async (scannedId) => {
     try {
-      const q = query(collection(db, "registrations"), where("id", "==", scannedId));
-      const snapshot = await getDocs(q);
+      const q = query(collection(db, "registrations"), where("id", "==", text));
+      const snap = await getDocs(q);
 
-      if (snapshot.empty) {
-        toast.error('ভুল QR কোড! রেজিস্ট্রেশন পাওয়া যায়নি।');
-        return;
-      }
-
-      const docData = snapshot.docs[0];
-      const data = docData.data();
-      const docRef = doc(db, "registrations", docData.id);
-
-      if (data.checkedIn) {
-        toast.error(`⚠️ ${data.name} (${data.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
+      if (snap.empty) {
+        toast.error('ভুল QR কোড!');
       } else {
-        await updateDoc(docRef, { checkedIn: true, checkInTime: new Date() });
-        toast.success(`স্বাগতম ${data.name}! (${data.totalMembers} জন)`);
+        const docData = snap.docs[0];
+        const data = docData.data();
+        const ref = doc(db, "registrations", docData.id);
+
+        if (data.checkedIn) {
+          toast.error(`⚠️ ${data.name} ইতিমধ্যে প্রবেশ করেছেন!`);
+        } else {
+          await updateDoc(ref, { checkedIn: true, checkInTime: new Date() });
+          toast.success(`স্বাগতম ${data.name}! (+${data.totalMembers} জন)`);
+        }
       }
     } catch (err) {
-      console.error(err);
-      toast.error('স্ক্যানিং এ সমস্যা হয়েছে।');
+      toast.error('সমস্যা হয়েছে');
     } finally {
       setLoading(false);
+
+      // ২.৩ সেকেন্ড পর অটো আবার চালু
+      setTimeout(() => {
+        setIsPaused(false);
+        setScanResult(null);
+      }, 2300);
     }
   };
 
-  // ম্যানুয়াল রিজিউম
+  // ম্যানুয়াল রিজিউম (যদি কেউ তাড়াতাড়ি চাপে)
   const resumeNow = () => {
     setIsPaused(false);
     setScanResult(null);
@@ -415,15 +341,18 @@ export default function ScanQRPage() {
       <h2 className="text-2xl font-bold text-center mb-4 text-indigo-700">এন্ট্রি স্ক্যানার</h2>
 
       <div className="bg-gray-100 rounded-xl overflow-hidden shadow-2xl border-4 border-indigo-500 relative">
-        <video
-          ref={videoRef}
-          className={`w-full ${isPaused ? 'hidden' : 'block'}`}
-          muted
-          playsInline
-        />
+        <div className={isPaused ? 'hidden' : 'block'}>
+          <QrReader
+            onResult={handleScan}
+            constraints={{ facingMode: 'environment' }}
+            scanDelay={300}
+            style={{ width: '100%' }}
+          />
+        </div>
 
+        {/* পজ ওভারলে */}
         {isPaused && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 bg-opacity-95 text-white p-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-95 text-white">
             {loading ? (
               <>
                 <svg className="animate-spin h-12 w-12 mb-4" viewBox="0 0 24 24" fill="none">
@@ -435,10 +364,10 @@ export default function ScanQRPage() {
               </>
             ) : (
               <>
-                <p className="text-lg mb-6 text-center">স্ক্যান সম্পন্ন<br />ID: {scanResult}</p>
+                <p className="text-lg mb-6 text-center">স্ক্যান হয়েছে<br />ID: {scanResult}</p>
                 <button
                   onClick={resumeNow}
-                  className="px-8 py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition"
+                  className="px-8 py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700"
                 >
                   আবার স্ক্যান করুন
                 </button>
@@ -455,18 +384,18 @@ export default function ScanQRPage() {
 
       <div className="mt-6">
         <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি:</h3>
-        <div className="bg-white rounded-lg shadow overflow-hidden max-h-64 overflow-y-auto">
+        <div className="bg-white rounded-lg shadow max-h-64 overflow-y-auto">
           {enteredList.length === 0 ? (
-            <p className="p-4 text-center text-gray-500">এখনও কেউ প্রবেশ করেনি</p>
+            <p className="p-4 text-center text-gray-500">কেউ আসেনি এখনো</p>
           ) : (
             <ul className="divide-y divide-gray-200">
               {enteredList.map(user => (
-                <li key={user.id} className="p-4 flex justify-between items-center">
+                <li key={user.id} className="p-4 flex justify-between">
                   <div>
                     <p className="font-bold">{user.name}</p>
                     <p className="text-xs text-gray-500">ID: {user.id}</p>
                   </div>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold">
                     +{user.totalMembers} জন
                   </span>
                 </li>
