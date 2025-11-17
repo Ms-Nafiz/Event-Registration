@@ -256,7 +256,9 @@
 //   );
 // }
 
-import { useState, useEffect, useRef } from 'react';
+// ScanQRPage.jsx  (পুরো ফাইলটা এই কোড দিয়ে রিপ্লেস কর)
+
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
@@ -266,80 +268,79 @@ export default function ScanQRPage() {
   const [enteredList, setEnteredList] = useState([]);
   const [totalEntered, setTotalEntered] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastScannedText = useRef<string>('');
-  const lastScannedTime = useRef<number>(0);
+  const videoRef = useRef(null);
+  const codeReaderRef = useRef(null);
+  const requestRef = useRef(null);
+  const lastScanned = useRef('');
+  const lastTime = useRef(0);
 
-  // রিয়েল-টাইম এন্ট্রি লিস্ট
+  // রিয়েলটাইম লিস্ট
   useEffect(() => {
     const q = query(
       collection(db, "registrations"),
       where("checkedIn", "==", true),
       orderBy("checkInTime", "desc")
     );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      let totalPeople = 0;
-      list.forEach(item => totalPeople += parseInt(item.totalMembers || 0));
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      let total = 0;
+      list.forEach(item => total += Number(item.totalMembers || 0));
       setEnteredList(list);
-      setTotalEntered(totalPeople);
-    }, (error) => {
-      console.error("Firestore error:", error);
-      toast.error("তালিকা লোড করা যায়নি।");
+      setTotalEntered(total);
+    }, (err) => {
+      console.error(err);
+      toast.error("লিস্ট লোড করা যায়নি");
     });
+
     return () => unsubscribe();
   }, []);
 
-  // ZXing Scanner চালু করা
+  // ZXing স্ক্যানার চালু
   useEffect(() => {
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
 
-    const startScanning = async () => {
+    const startCameraAndScan = async () => {
       if (!videoRef.current) return;
 
       try {
-        // Back camera (environment) নেওয়ার চেষ্টা
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+          video: { facingMode: "environment" }
         });
 
         videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        await videoRef.current.play();
+        videoRef.current.play();
 
-        const scan = () => {
+        const tick = () => {
           if (!videoRef.current || isPaused || loading) {
-            animationFrameRef.current = requestAnimationFrame(scan);
+            requestRef.current = requestAnimationFrame(tick);
             return;
           }
 
-          codeReader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
+          codeReader.decodeFromVideoElement(videoRef.current, (result, error) => {
             if (result) {
               const text = result.getText();
               const now = Date.now();
 
-              // Duplicate avoid (২ সেকেন্ডের মধ্যে একই QR না আসে)
-              if (text === lastScannedText.current && now - lastScannedTime.current < 2000) {
-                animationFrameRef.current = requestAnimationFrame(scan);
+              // একই QR বারবার না আসে
+              if (text === lastScanned.current && now - lastTime.current < 2000) {
+                requestRef.current = requestAnimationFrame(tick);
                 return;
               }
 
-              lastScannedText.current = text;
-              lastScannedTime.current = now;
+              lastScanned.current = text;
+              lastTime.current = now;
 
-              // পজ করা + লোডিং দেখানো
               setIsPaused(true);
               setLoading(true);
               setScanResult(text);
               handleScanResult(text);
 
-              // অটো রিজিউম ২.৫ সেকেন্ড পর
+              // ২.৫ সেকেন্ড পর অটো আবার চালু
               setTimeout(() => {
                 setIsPaused(false);
                 setScanResult(null);
@@ -347,54 +348,52 @@ export default function ScanQRPage() {
               }, 2500);
             }
 
-            if (err && !(err instanceof NotFoundException)) {
-              console.warn(err);
+            if (error && !(error instanceof NotFoundException)) {
+              console.warn(error);
             }
 
-            animationFrameRef.current = requestAnimationFrame(scan);
+            requestRef.current = requestAnimationFrame(tick);
           });
         };
 
-        scan();
+        tick();
 
       } catch (err) {
-        console.error("Camera access failed:", err);
-        toast.error("ক্যামেরা চালু করা যাচ্ছে না। অনুমতি দিন।");
+        toast.error("ক্যামেরা চালু করতে সমস্যা হয়েছে। অনুমতি দিন।");
       }
     };
 
-    startScanning();
+    startCameraAndScan();
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
       codeReader.reset();
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
 
-  // Firebase লজিক (তোমার আগেরটা একদম অপরিবর্তিত)
-  const handleScanResult = async (scannedId: string) => {
+  // ফায়ারবেস চেক
+  const handleScanResult = async (scannedId) => {
     try {
       const q = query(collection(db, "registrations"), where("id", "==", scannedId));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
+      if (snapshot.empty) {
         toast.error('ভুল QR কোড! রেজিস্ট্রেশন পাওয়া যায়নি।');
-      } else {
-        const docData = querySnapshot.docs[0];
-        const regData = docData.data();
-        const docRef = doc(db, "registrations", docData.id);
+        return;
+      }
 
-        if (regData.checkedIn) {
-          toast.error(`⚠️ ${regData.name} (${regData.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
-        } else {
-          await updateDoc(docRef, { checkedIn: true, checkInTime: new Date() });
-          toast.success(`স্বাগতম ${regData.name}! (${regData.totalMembers} জন)`);
-        }
+      const docData = snapshot.docs[0];
+      const data = docData.data();
+      const docRef = doc(db, "registrations", docData.id);
+
+      if (data.checkedIn) {
+        toast.error(`⚠️ ${data.name} (${data.id}) ইতিমধ্যে প্রবেশ করেছেন!`);
+      } else {
+        await updateDoc(docRef, { checkedIn: true, checkInTime: new Date() });
+        toast.success(`স্বাগতম ${data.name}! (${data.totalMembers} জন)`);
       }
     } catch (err) {
       console.error(err);
@@ -404,8 +403,8 @@ export default function ScanQRPage() {
     }
   };
 
-  // ম্যানুয়াল রিজিউম (যদি কেউ তাড়াতাড়ি চাপতে চায়)
-  const handleResumeClick = () => {
+  // ম্যানুয়াল রিজিউম
+  const resumeNow = () => {
     setIsPaused(false);
     setScanResult(null);
     setLoading(false);
@@ -419,27 +418,27 @@ export default function ScanQRPage() {
         <video
           ref={videoRef}
           className={`w-full ${isPaused ? 'hidden' : 'block'}`}
-          style={{ maxHeight: '70vh' }}
+          muted
+          playsInline
         />
 
-        {/* পজড ওভারলে */}
         {isPaused && (
-          <div className="absolute inset-0 h-[300px] flex flex-col items-center justify-center bg-gray-800 text-white p-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 bg-opacity-95 text-white p-6">
             {loading ? (
               <>
-                <svg className="animate-spin h-8 w-8 text-white mb-3" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg className="animate-spin h-12 w-12 mb-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <p className="text-lg">যাচাই করা হচ্ছে...</p>
-                <p className="text-sm">ID: {scanResult}</p>
+                <p className="text-xl">যাচাই করা হচ্ছে...</p>
+                <p className="text-sm mt-2">ID: {scanResult}</p>
               </>
             ) : (
               <>
-                <p className="text-lg mb-4 text-center">স্ক্যান সম্পন্ন<br />রেজাল্ট: {scanResult}</p>
+                <p className="text-lg mb-6 text-center">স্ক্যান সম্পন্ন<br />ID: {scanResult}</p>
                 <button
-                  onClick={handleResumeClick}
-                  className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700"
+                  onClick={resumeNow}
+                  className="px-8 py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition"
                 >
                   আবার স্ক্যান করুন
                 </button>
@@ -449,31 +448,31 @@ export default function ScanQRPage() {
         )}
       </div>
 
-      {/* পরিসংখ্যান */}
       <div className="mt-6 bg-green-100 p-4 rounded-lg border border-green-400 text-center">
         <h3 className="text-xl font-bold text-green-800">মোট প্রবেশ করেছে</h3>
-        <p className="text-4xl font-bold text-green-600">{totalEntered} জন</p>
+        <p className="text-5xl font-bold text-green-600">{totalEntered} জন</p>
       </div>
 
-      {/* সাম্প্রতিক এন্ট্রি লিস্ট */}
       <div className="mt-6">
-        <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি (নতুনটি উপরে):</h3>
-        <div className="bg-white shadow rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-          <ul className="divide-y divide-gray-200">
-            {enteredList.length > 0 ? enteredList.map((user: any) => (
-              <li key={user.id} className="p-3 flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-gray-800">{user.name}</p>
-                  <p className="text-xs text-gray-500">ID: {user.id}</p>
-                </div>
-                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">
-                  +{user.totalMembers} জন
-                </span>
-              </li>
-            )) : (
-              <li className="p-4 text-center text-gray-500">এখনও কেউ প্রবেশ করেনি।</li>
-            )}
-          </ul>
+        <h3 className="text-lg font-bold mb-2">সাম্প্রতিক এন্ট্রি:</h3>
+        <div className="bg-white rounded-lg shadow overflow-hidden max-h-64 overflow-y-auto">
+          {enteredList.length === 0 ? (
+            <p className="p-4 text-center text-gray-500">এখনও কেউ প্রবেশ করেনি</p>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {enteredList.map(user => (
+                <li key={user.id} className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold">{user.name}</p>
+                    <p className="text-xs text-gray-500">ID: {user.id}</p>
+                  </div>
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+                    +{user.totalMembers} জন
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
