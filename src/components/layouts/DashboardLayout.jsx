@@ -1,44 +1,81 @@
-import { useState } from 'react';
-import Sidebar from './Sidebar'; // Sidebar ekhon nijei responsive
+import { useState } from "react";
+import Sidebar from "./Sidebar";
+import { useLocation, Outlet } from "react-router-dom";
 
-export default function DashboardLayout({ children }) {
-  // ১. Sidebar kholar jonno state
+export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+
+  const pageTitles = {
+    "/admin/dashboard": "ড্যাশবোর্ড",
+    "/admin/users": "ব্যবহারকারী",
+    "/admin/scan": "QR স্ক্যানার",
+    "/admin/create-entry": "নতুন রেজিস্ট্রেশন",
+    "/admin/list": "রেজিস্ট্রেশন তালিকা",
+    "/admin/groups": "গ্রুপ ম্যানেজমেন্ট",
+    "/admin/profile": "প্রোফাইল",
+    "/admin/donate": "ডোনেশন",
+    "/admin/bulk-donate": "বাল্ক আপলোড",
+    "/admin/donation-list": "ডোনেশন তালিকা",
+    "/admin/contribution-summary": "চাঁদা সারাংশ",
+  };
+
+  const currentTitle = pageTitles[location.pathname] || "অ্যাডমিন প্যানেল";
 
   return (
-    <div className="flex h-screen bg-gray-100 font-bangla">
-      
-      {/* --- SHOMADHAN ---
-        Ekhon shudhu Sidebar component-ke ekbar call kora hocche.
-        Sidebar nijei bujhe nibe kokhon mobile ba desktop dekhte hobe.
-        Nicher ditiyo call-ti (jeta div-er moddhe chilo) baad deya hoyeche.
-      */}
-      <Sidebar mobileOpen={sidebarOpen} setMobileOpen={setSidebarOpen} />
+    <div className="flex h-screen bg-slate-50 font-bangla overflow-hidden">
+      <Sidebar
+        mobileOpen={sidebarOpen}
+        setMobileOpen={setSidebarOpen}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+      />
 
-      {/* --- Mul Content Area --- */}
-      <main className="flex-1 overflow-y-auto focus:outline-none">
-        
-        {/* --- Top Bar (Mobile toggle button soho) --- */}
-        <header className="bg-white shadow-md p-4 sticky top-0 z-10 flex items-center">
-          
-          {/* --- Hamburger Button (Shudhu mobile-e dekhabe) --- */}
-          <button
-            onClick={() => setSidebarOpen(true)} // Toggle-ti ekhon kaj korbe
-            className="md:hidden p-2 text-gray-500 rounded-md hover:text-gray-900 hover:bg-gray-100"
-          >
-            <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          
-          <h2 className="text-2xl font-semibold text-gray-800 ml-2">
-            Admin Dashboard
-          </h2>
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="bg-white border-b border-slate-200 h-20 flex items-center justify-between px-6 md:px-8 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 -ml-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            >
+              <svg
+                className="h-6 w-6"
+                stroke="currentColor"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
+                {currentTitle}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Right side actions (Notification, etc. can go here) */}
+            <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              সিস্টেম সচল
+            </div>
+          </div>
         </header>
 
-        {/* Content */}
-        <div className="p-6 md:p-8">
-          {children}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>

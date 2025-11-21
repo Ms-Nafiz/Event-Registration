@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase"; // Firebase DB
-import { collection, getDocs, addDoc, doc, updateDoc, getDoc, setDoc, increment } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+  getDoc,
+  setDoc,
+  increment,
+} from "firebase/firestore";
 import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { EntryCardDocument } from "../components/EntryCardPDF"; // PDF কম্পোনেন্ট
@@ -21,7 +30,7 @@ export default function RegistrationFormPage() {
     mobile: "",
     email: "",
     headOfFamily: "",
-    transactionId: "",
+    contributeAmount: "",
     paymentStatus: "Pending",
     members: [{ ...initialMember, member_name: "" }], // প্রথম মেম্বার নাম ছাড়া শুরু
     group_id: "",
@@ -33,29 +42,29 @@ export default function RegistrationFormPage() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   // গ্রুপ লোড (ফায়ারবেস থেকে)
-    useEffect(() => {
-        const fetchGroups = async () => {
-            try {
-                const querySnapshot = await getDocs(collection(db, "groups"));
-                const groupsList = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                
-                setGroups(groupsList);
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "groups"));
+        const groupsList = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
-                // প্রথম গ্রুপটিকে ডিফল্ট হিসেবে সিলেক্ট করুন (যদি গ্রুপ থাকে)
-                if (groupsList.length > 0) {
-                    setFormData(prev => ({ ...prev, group_id: groupsList[0].id }));
-                }
-            } catch (error) {
-                console.error("Error fetching groups: ", error);
-                toast.error('গ্রুপ তালিকা লোড করা যায়নি।');
-            }
-        };
+        setGroups(groupsList);
 
-        fetchGroups();
-    }, []);
+        // প্রথম গ্রুপটিকে ডিফল্ট হিসেবে সিলেক্ট করুন (যদি গ্রুপ থাকে)
+        if (groupsList.length > 0) {
+          setFormData((prev) => ({ ...prev, group_id: groupsList[0].id }));
+        }
+      } catch (error) {
+        console.error("Error fetching groups: ", error);
+        toast.error("গ্রুপ তালিকা লোড করা যায়নি।");
+      }
+    };
+
+    fetchGroups();
+  }, []);
 
   // ১. সাধারণ ইনপুট হ্যান্ডেলার
   const handleChange = (e) => {
@@ -94,81 +103,91 @@ export default function RegistrationFormPage() {
 
   // ৫. ফর্ম সাবমিট
   // সাবমিট হ্যান্ডেলার (Firebase)
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setSuccessData(null);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccessData(null);
 
+    try {
+      // ✅ প্রথম সদস্যের নাম প্রধান নাম থেকে নেওয়া (Sync করা)
+      const updatedMembers = [...formData.members];
+      updatedMembers[0] = {
+        ...updatedMembers[0],
+        member_name: formData.name, // প্রথম সদস্যের নাম main name থেকে
+      };
+
+      const totalMembers = updatedMembers.length;
+      // ইউনিক আইডি জেনারেট (সিম্পল)
+      const regId = "HF-" + Math.floor(100000 + Math.random() * 900000);
+
+      const dataToSend = {
+        id: regId, // আমাদের নিজস্ব আইডি
+        ...formData,
+        members: updatedMembers, // ✅ আপডেট করা members array
+        totalMembers,
+        createdAt: new Date(),
+      };
+
+      // ১. ফায়ারবেসে সেভ করা
+      await addDoc(collection(db, "registrations"), dataToSend);
+
+      // ২. QR কোড তৈরি করা (PDF এর জন্য)
+      const qrUrl = await QRCode.toDataURL(regId);
+      setQrCodeUrl(qrUrl);
+      setSuccessData(dataToSend); // এটি সেট করলেই বাটন দেখাবে
+
+      toast.success("✅ রেজিস্ট্রেশন সফল!");
+
+      // ফর্ম রিসেট
+      setFormData({
+        name: "",
+        mobile: "",
+        email: "",
+        group_id: "1",
+        contributeAmount: "",
+        paymentStatus: "Pending",
+        members: [{ ...initialMember }],
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("ত্রুটি হয়েছে: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // --- ২. ভিজিটর ট্র্যাকিং এফেক্ট ---
+  useEffect(() => {
+    const trackVisit = async () => {
+      // চেক করি এই সেশনে ইউজার ইতিমধ্যে ভিজিট করেছে কিনা
+      const hasVisited = sessionStorage.getItem("hasVisited");
+
+      if (!hasVisited) {
         try {
-            const totalMembers = formData.members.length;
-            // ইউনিক আইডি জেনারেট (সিম্পল)
-            const regId = 'HF-' + Math.floor(100000 + Math.random() * 900000);
+          const statsRef = doc(db, "stats", "page_views");
+          const docSnap = await getDoc(statsRef);
 
-            const dataToSend = {
-                id: regId, // আমাদের নিজস্ব আইডি
-                ...formData,
-                totalMembers,
-                createdAt: new Date()
-            };
-
-            // ১. ফায়ারবেসে সেভ করা
-            await addDoc(collection(db, "registrations"), dataToSend);
-
-            // ২. QR কোড তৈরি করা (PDF এর জন্য)
-            const qrUrl = await QRCode.toDataURL(regId);
-            setQrCodeUrl(qrUrl);
-            setSuccessData(dataToSend); // এটি সেট করলেই বাটন দেখাবে
-
-            toast.success('✅ রেজিস্ট্রেশন সফল!');
-            
-            // ফর্ম রিসেট
-            setFormData({
-                name: '', mobile: '', email: '', group_id: '1', 
-                transactionId: '', paymentStatus: 'Pending', 
-                members: [{ ...initialMember }]
+          if (docSnap.exists()) {
+            // ডকুমেন্ট থাকলে ১ বাড়ান
+            await updateDoc(statsRef, {
+              count: increment(1),
             });
+          } else {
+            // ডকুমেন্ট না থাকলে তৈরি করুন (প্রথম ভিজিট)
+            await setDoc(statsRef, {
+              count: 1,
+            });
+          }
 
+          // ব্রাউজারে মার্ক করে রাখা যে ভিজিট কাউন্ট হয়েছে
+          sessionStorage.setItem("hasVisited", "true");
         } catch (error) {
-            console.error(error);
-            toast.error('ত্রুটি হয়েছে: ' + error.message);
-        } finally {
-            setLoading(false);
+          console.error("Tracking Error:", error);
         }
+      }
     };
-// --- ২. ভিজিটর ট্র্যাকিং এফেক্ট ---
-    useEffect(() => {
-        const trackVisit = async () => {
-            // চেক করি এই সেশনে ইউজার ইতিমধ্যে ভিজিট করেছে কিনা
-            const hasVisited = sessionStorage.getItem('hasVisited');
 
-            if (!hasVisited) {
-                try {
-                    const statsRef = doc(db, "stats", "page_views");
-                    const docSnap = await getDoc(statsRef);
-
-                    if (docSnap.exists()) {
-                        // ডকুমেন্ট থাকলে ১ বাড়ান
-                        await updateDoc(statsRef, {
-                            count: increment(1)
-                        });
-                    } else {
-                        // ডকুমেন্ট না থাকলে তৈরি করুন (প্রথম ভিজিট)
-                        await setDoc(statsRef, {
-                            count: 1
-                        });
-                    }
-                    
-                    // ব্রাউজারে মার্ক করে রাখা যে ভিজিট কাউন্ট হয়েছে
-                    sessionStorage.setItem('hasVisited', 'true');
-                    
-                } catch (error) {
-                    console.error("Tracking Error:", error);
-                }
-            }
-        };
-
-        trackVisit();
-    }, []);
+    trackVisit();
+  }, []);
   return (
     <div className="max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl font-bangla">
       <h2 className="text-3xl font-bold text-gray-800 border-b pb-4 mb-6 text-center">
@@ -176,22 +195,28 @@ export default function RegistrationFormPage() {
       </h2>
 
       {/* --- ডাউনলোড বাটন (সফল হলে দেখাবে) --- */}
-                {successData && qrCodeUrl && (
-                    <div className="mb-6 p-4 bg-green-100 border border-green-400 rounded-lg text-center">
-                        <p className="text-lg font-bold text-green-800 mb-2">রেজিস্ট্রেশন সফল!</p>
-                        
-                        <PDFDownloadLink 
-                            document={<EntryCardDocument data={successData} qrCodeUrl={qrCodeUrl} />} 
-                            fileName={`entry-card-${successData.id}.pdf`}
-                        >
-                            {({ loading }) => 
-                                <button className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 font-bold">
-                                    {loading ? 'PDF তৈরি হচ্ছে...' : '📥 এন্ট্রি কার্ড ডাউনলোড করুন'}
-                                </button>
-                            }
-                        </PDFDownloadLink>
-                    </div>
-                )}
+      {successData && qrCodeUrl && (
+        <div className="mb-6 p-4 bg-green-100 border border-green-400 rounded-lg text-center">
+          <p className="text-lg font-bold text-green-800 mb-2">
+            রেজিস্ট্রেশন সফল!
+          </p>
+
+          <PDFDownloadLink
+            document={
+              <EntryCardDocument data={successData} qrCodeUrl={qrCodeUrl} />
+            }
+            fileName={`entry-card-${successData.id}.pdf`}
+          >
+            {({ loading }) => (
+              <button className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 font-bold">
+                {loading
+                  ? "PDF তৈরি হচ্ছে..."
+                  : "📥 এন্ট্রি কার্ড ডাউনলোড করুন"}
+              </button>
+            )}
+          </PDFDownloadLink>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* --- ১. মূল ব্যক্তি ও যোগাযোগের তথ্য --- */}
@@ -289,16 +314,16 @@ export default function RegistrationFormPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label
-                htmlFor="transactionId"
+                htmlFor="contributeAmount"
                 className="block text-sm font-medium text-gray-700"
               >
                 চাঁদার পরিমান
               </label>
               <input
-                type="text"
-                id="transactionId"
-                name="transactionId"
-                value={formData.transactionId}
+                type="number"
+                id="contributeAmount"
+                name="contributeAmount"
+                value={formData.contributeAmount}
                 onChange={handleChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="যেমন: ১০০০"

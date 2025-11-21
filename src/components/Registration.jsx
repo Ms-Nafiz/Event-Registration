@@ -36,7 +36,7 @@ export default function RegistrationFormPage() {
             group_id: response.data[0].id.toString(),
           }));
         }
-      } catch (error) {
+      } catch {
         toast.error("❌ গ্রুপ তালিকা লোড করা যায়নি।", {
           className: "font-bangla",
         });

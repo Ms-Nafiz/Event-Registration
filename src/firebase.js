@@ -3,15 +3,14 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// আপনার Firebase কনসোল থেকে কপি করা কনফিগ এখানে পেস্ট করুন
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyBGqWpLlUTRgqXAtEVOQx36shmLQia7zkM",
-  authDomain: "horkoraevent.firebaseapp.com",
-  projectId: "horkoraevent",
-  storageBucket: "horkoraevent.firebasestorage.app",
-  messagingSenderId: "156489323330",
-  appId: "1:156489323330:web:a7d29a1a0d548023a9eedb",
-
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);

@@ -16,21 +16,18 @@ import toast from "react-hot-toast";
 export default function ScanQRPage() {
   const [enteredList, setEnteredList] = useState([]);
   const [totalEntered, setTotalEntered] = useState(0);
-  const [loading, setLoading] = useState(false); // "যাচাই করা হচ্ছে"
+  const [loading, setLoading] = useState(false);
   const [scanResult, setScanResult] = useState(null);
-  const [isPaused, setIsPaused] = useState(false); // স্ক্যানার পজড কিনা
+  const [isPaused, setIsPaused] = useState(false);
 
-  // স্ক্যানার অবজেক্টকে রেফারেন্সে রাখা (এটি রিরেন্ডার হলেও টিকে থাকবে)
   const scannerRef = useRef(null);
-  // স্ক্যানার যে div এ রেন্ডার হবে তার ID
   const scannerRegionId = "qr-reader";
 
-  // --- ১. রিয়েল-টাইম এন্ট্রি লিস্ট (ইনডেক্স সহ) ---
   useEffect(() => {
     const q = query(
       collection(db, "registrations"),
       where("checkedIn", "==", true),
-      orderBy("checkInTime", "desc") // নতুন এন্ট্রি উপরে
+      orderBy("checkInTime", "desc")
     );
 
     const unsubscribe = onSnapshot(
@@ -46,21 +43,19 @@ export default function ScanQRPage() {
           (item) => (totalPeople += parseInt(item.totalMembers || 0))
         );
 
-        setEnteredList(list); // <-- তালিকা আপডেট
-        setTotalEntered(totalPeople); // <-- মোট সংখ্যা আপডেট
+        setEnteredList(list);
+        setTotalEntered(totalPeople);
       },
       (error) => {
-        console.error("Firestore query error (Index needed?):", error);
-        toast.error("তালিকা লোড করা যায়নি। Firebase Console চেক করুন।");
+        console.error("Firestore query error:", error);
+        toast.error("তালিকা লোড করা যায়নি।");
       }
     );
 
     return () => unsubscribe();
-  }, []); // [] খালি রাখা নিশ্চিত করুন (শুধু একবার চলবে)
+  }, []);
 
-  // --- ২. QR স্ক্যানার চালু করা ---
   useEffect(() => {
-    // শুধুমাত্র যদি স্ক্যানার আগে তৈরি না হয়ে থাকে
     if (!scannerRef.current) {
       const html5QrcodeScanner = new Html5QrcodeScanner(
         scannerRegionId,
@@ -73,24 +68,21 @@ export default function ScanQRPage() {
       );
 
       const onScanSuccess = (decodedText) => {
-        // যদি একটি স্ক্যান প্রসেসিং অবস্থায় থাকে (loading = true), তবে নতুন স্ক্যান নেব না
         if (loading) return;
 
-        // স্ক্যানার পজ করুন (ref ব্যবহার করে)
         if (scannerRef.current) {
           scannerRef.current.pause(true);
         }
         setIsPaused(true);
-        setLoading(true); // "যাচাই করা হচ্ছে..." চালু
+        setLoading(true);
         setScanResult(decodedText);
-        handleScanResult(decodedText); // ফায়ারবেস লজিক কল করুন
+        handleScanResult(decodedText);
       };
 
-      html5QrcodeScanner.render(onScanSuccess, (error) => {});
-      scannerRef.current = html5QrcodeScanner; // রেফারেন্সে সেভ করুন
+      html5QrcodeScanner.render(onScanSuccess, () => {});
+      scannerRef.current = html5QrcodeScanner;
     }
 
-    // কম্পোনেন্টটি বন্ধ হলে ক্যামেরা রিলিজ করুন
     return () => {
       if (scannerRef.current) {
         scannerRef.current
@@ -99,9 +91,9 @@ export default function ScanQRPage() {
         scannerRef.current = null;
       }
     };
-  }, []); // <-- এই খালি অ্যারেটি [ ] খুবই গুরুত্বপূর্ণ, এটিই বাগ ফিক্স করে
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // --- ৩. ফায়ারবেস লজিক ---
   const handleScanResult = async (scannedId) => {
     try {
       const q = query(
@@ -118,9 +110,7 @@ export default function ScanQRPage() {
         const docRef = doc(db, "registrations", docData.id);
 
         if (regData.checkedIn) {
-          toast.error(
-            `⚠️ ${regData.name} (${regData.id}) ইতিমধ্যে প্রবেশ করেছেন!`
-          );
+          toast.error(`⚠️ ${regData.name} ইতিমধ্যে প্রবেশ করেছেন!`);
         } else {
           await updateDoc(docRef, { checkedIn: true, checkInTime: new Date() });
           toast.success(
@@ -128,131 +118,156 @@ export default function ScanQRPage() {
           );
         }
       }
-    } catch (err) {
+    } catch {
       toast.error("স্ক্যানিং এ সমস্যা হয়েছে।");
     } finally {
-      // লোডার বন্ধ করুন, কিন্তু স্ক্যানার পজড রাখুন
       setLoading(false);
-      // ***** এই লাইনটা যোগ করুন — অটো রিজিউম *****
       setTimeout(() => {
         if (scannerRef.current) {
-          // যদি এখনো paused থাকে তবেই resume করবে
           if (scannerRef.current.getState() === "PAUSED") {
             scannerRef.current.resume();
           }
           setIsPaused(false);
         }
-      }, 2000); // ২.৫ সেকেন্ড পর আবার চালু হবে (আপনি 2000 বা 3000 করতে পারেন)
+      }, 2000);
     }
   };
 
-  // --- ৪. "আবার স্ক্যান করুন" বাটন ক্লিক হ্যান্ডেলার ---
   const handleResumeClick = () => {
-    // ref থেকে স্ক্যানারটি খুঁজে বের করুন
     if (scannerRef.current && scannerRef.current.getState() === "PAUSED") {
       scannerRef.current.resume();
     }
-    setIsPaused(false); // পজড স্টেট false করুন
-    setScanResult(null); // রেজাল্ট মেসেজ ক্লিয়ার করুন
+    setIsPaused(false);
+    setScanResult(null);
   };
 
   return (
-    <div className="p-4 font-bangla max-w-md mx-auto">
-      <h2 className="text-2xl font-bold text-center mb-4 text-indigo-700">
-        📲 এন্ট্রি স্ক্যানার
-      </h2>
+    <div className="p-4 md:p-8 font-bangla max-w-2xl mx-auto space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-800">এন্ট্রি স্ক্যানার</h2>
+        <p className="text-sm text-gray-500">অতিথিদের QR কোড স্ক্যান করুন</p>
+      </div>
 
-      {/* --- ক্যামেরা সেকশন --- */}
-      <div className="bg-gray-100 rounded-xl overflow-hidden shadow-2xl border-4 border-indigo-500 relative">
-        {/* এই div-এর ভেতরে স্ক্যানারটি লোড হবে */}
+      {/* Scanner Section */}
+      <div className="bg-white p-4 rounded-2xl shadow-lg border border-gray-100 overflow-hidden relative">
         <div
           id={scannerRegionId}
-          className={`w-full ${isPaused ? "hidden" : "block"}`}
+          className={`w-full rounded-xl overflow-hidden ${
+            isPaused ? "hidden" : "block"
+          }`}
         ></div>
 
-        {/* --- পজড (Paused) মেসেজ --- */}
+        {/* Paused/Result View */}
         {isPaused && (
-          <div className="w-full h-[300px] flex flex-col items-center justify-center bg-gray-800 text-white p-4">
+          <div className="absolute inset-0 bg-gray-900/95 flex flex-col items-center justify-center text-white p-6 z-10">
             {loading ? (
-              <>
-                <svg
-                  className="animate-spin h-8 w-8 text-white mb-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <p className="text-lg">যাচাই করা হচ্ছে...</p>
-                <p className="text-sm">রেজাল্ট: {scanResult}</p>
-              </>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                <p className="text-lg font-medium">যাচাই করা হচ্ছে...</p>
+                <p className="text-sm text-gray-400 mt-2">ID: {scanResult}</p>
+              </div>
             ) : (
-              <>
-                <p className="text-lg mb-4 text-center">
-                  স্ক্যান সম্পন্ন। <br /> রেজাল্ট: {scanResult}
-                </p>
-                {/* --- আসল বাটন --- */}
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-green-500/30">
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="3"
+                      d="M5 13l4 4L19 7"
+                    ></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">স্ক্যান সম্পন্ন!</h3>
+                  <p className="text-gray-400 mt-1 text-sm break-all">
+                    {scanResult}
+                  </p>
+                </div>
                 <button
                   onClick={handleResumeClick}
-                  className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 active:bg-indigo-800"
+                  className="px-8 py-3 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-colors shadow-lg active:scale-95"
                 >
                   আবার স্ক্যান করুন
                 </button>
-              </>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* --- পরিসংখ্যান --- */}
-      <div className="mt-6 bg-green-100 p-4 rounded-lg border border-green-400 text-center">
-        <h3 className="text-xl font-bold text-green-800">মোট প্রবেশ করেছে</h3>
-        <p className="text-4xl font-bold text-green-600">{totalEntered} জন</p>
+      {/* Stats Card */}
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-between">
+        <div>
+          <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">
+            মোট প্রবেশ করেছে
+          </p>
+          <h3 className="text-4xl font-bold mt-1">
+            {totalEntered}{" "}
+            <span className="text-lg font-normal opacity-80">জন</span>
+          </h3>
+        </div>
+        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+          <svg
+            className="w-6 h-6 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+            ></path>
+          </svg>
+        </div>
       </div>
 
-      {/* --- যারা প্রবেশ করেছে তাদের তালিকা --- */}
-      <div className="mt-6">
-        <h3 className="text-lg font-bold mb-2">
-          সাম্প্রতিক এন্ট্রি (নতুনটি উপরে):
-        </h3>
-        <div className="bg-white shadow rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-          <ul className="divide-y divide-gray-200">
-            {enteredList.length > 0 ? (
-              enteredList.map((user) => (
-                <li
+      {/* Recent Entries List */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 border-b border-gray-50 bg-gray-50/50">
+          <h3 className="font-bold text-gray-800">সাম্প্রতিক এন্ট্রি</h3>
+        </div>
+        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+          {enteredList.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {enteredList.map((user) => (
+                <div
                   key={user.id}
-                  className="p-3 list-none flex justify-between items-center border-b"
+                  className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
-                  <div>
-                    <p className="font-bold text-gray-800">{user.name}</p>
-                    <p className="text-xs text-gray-500">ID: {user.id}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                      {user.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-gray-400 font-mono">
+                        {user.id.slice(0, 8)}...
+                      </p>
+                    </div>
                   </div>
-                  <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">
+                  <span className="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-bold">
                     +{user.totalMembers} জন
                   </span>
-                </li>
-              ))
-            ) : (
-              <li className="p-4 text-center text-gray-500 list-none">
-                এখনও কেউ প্রবেশ করেনি।
-              </li>
-            )}
-          </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-gray-400 text-sm">
+              এখনও কেউ প্রবেশ করেনি।
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
