@@ -9,18 +9,17 @@ import QRCode from "qrcode";
 export default function RegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // ১. প্রথমে সব গ্রুপ নিয়ে আসুন (নাম ম্যাপ করার জন্য)
         const groupsSnapshot = await getDocs(collection(db, "groups"));
         const groupsMap = {};
         groupsSnapshot.forEach((doc) => {
-          // ID কে key এবং Name কে value হিসেবে রাখা হলো
           groupsMap[doc.id] = doc.data().name;
         });
-        // ২. এবার রেজিস্ট্রেশন ডেটা আনুন
+
         const q = query(
           collection(db, "registrations"),
           orderBy("createdAt", "desc")
@@ -29,25 +28,19 @@ export default function RegistrationListPage() {
 
         const data = querySnapshot.docs.map((doc) => {
           const docData = doc.data();
-
-          // গ্রুপের নাম বের করা (যদি ডেটায় সরাসরি না থাকে, তবে ID দিয়ে ম্যাপ থেকে বের করা)
           const groupNameResolve =
             docData.groupName || groupsMap[docData.group_id] || "N/A";
-
-          // সদস্য সংখ্যা ঠিক করা (বানান ভিন্ন হতে পারে তাই দুটি চেক করা)
           const totalMemResolve =
             docData.totalMembers || docData.total_members || 0;
 
           return {
             id: doc.id,
             ...docData,
-            // আমরা ফিক্সড ভ্যালুগুলো এখানে সেট করে দিচ্ছি
             finalGroupName: groupNameResolve,
             finalTotalMembers: totalMemResolve,
           };
         });
 
-        // প্রতিটি ডেটার জন্য QR কোড তৈরি করা (PDF এর জন্য)
         const dataWithQR = await Promise.all(
           data.map(async (item) => {
             const qrUrl = await QRCode.toDataURL(item.id);
@@ -65,164 +58,156 @@ export default function RegistrationListPage() {
     fetchData();
   }, []);
 
+  // Filter logic
+  const filteredRegistrations = registrations.filter(reg => 
+    reg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    reg.mobile.includes(searchTerm) ||
+    (reg.finalGroupName && reg.finalGroupName.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
-    <div className="p-6 md:p-8 font-bangla">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">
-        📜 রেজিস্ট্রেশন তালিকা
-      </h2>
+    <div className="p-4 md:p-8 font-bangla max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">রেজিস্ট্রেশন তালিকা</h2>
+          <p className="text-sm text-gray-500">মোট রেজিস্ট্রেশন: {filteredRegistrations.length}</p>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="relative w-full md:w-64">
+          <input
+            type="text"
+            placeholder="নাম, মোবাইল বা গ্রুপ খুঁজুন..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          />
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </div>
 
-      {/* --- Table --- */}
-      <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
-        {loading && (
-          <div className="p-6 text-center text-gray-500">লোড হচ্ছে...</div>
-        )}
-
-        {!loading && registrations.length === 0 && (
-          <div className="p-6 text-center text-gray-500">
-            এখনও কোনো রেজিস্ট্রেশন হয়নি।
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+             <p className="text-gray-500 text-sm">ডেটা লোড হচ্ছে...</p>
           </div>
-        )}
+        ) : filteredRegistrations.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">
+            কোনো তথ্য পাওয়া যায়নি।
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-50">
+                <thead className="bg-gray-50/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">প্রতিনিধি</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">গ্রুপ</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">সদস্য</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">অতিরিক্ত সদস্য</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">স্ট্যাটাস</th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-50">
+                  {filteredRegistrations.map((reg) => (
+                    <tr key={reg.id} className="hover:bg-gray-50/80 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{reg.name}</div>
+                        <div className="text-xs text-gray-400">{reg.mobile}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="bg-gray-100 text-gray-600 py-1 px-2 rounded text-xs">{reg.finalGroupName}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-gray-700">
+                        {reg.finalTotalMembers}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
+                        {reg.members && reg.members.length > 1 ? (
+                          <span title={reg.members.slice(1).map(m => m.member_name).join(", ")}>
+                            {reg.members.length - 1} জন অতিরিক্ত
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${
+                          reg.paymentStatus === "Paid" ? "bg-green-100 text-green-700" : 
+                          reg.paymentStatus === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {reg.paymentStatus === "Paid" ? "পরিশোধিত" : "অপেক্ষমান"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <PDFDownloadLink
+                          document={<EntryCardDocument data={{...reg, groupName: reg.finalGroupName, totalMembers: reg.finalTotalMembers}} qrCodeUrl={reg.qrCodeUrl} />}
+                          fileName={`card-${reg.id}.pdf`}
+                        >
+                          {({ loading }) => (
+                            <button className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                              loading ? "bg-gray-100 text-gray-400" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                            }`}>
+                              {loading ? "..." : <><span>⬇</span> PDF</>}
+                            </button>
+                          )}
+                        </PDFDownloadLink>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        {!loading && registrations.length > 0 && (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  প্রতিনিধি (Rep)
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  গ্রুপ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  মোট সদস্য
-                </th>
-
-                {/* === নতুন কলাম === */}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  অতিরিক্ত সদস্য
-                </th>
-
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  পেমেন্ট স্ট্যাটাস
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  অ্যাকশন
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {registrations.map((reg) => (
-                <tr key={reg.id}>
-                  {/* Protinidhi-r tottho */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm font-medium text-gray-900">
-                      {reg.name}
-                    </p>
-                    <p className="text-sm text-gray-500">{reg.mobile}</p>
-                  </td>
-
-                  {/* Group */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm text-gray-900">
-                      {reg.finalGroupName || "N/A"}
-                    </p>
-                  </td>
-
-                  {/* Mot Sodossho */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm text-gray-900">
-                      {reg.finalTotalMembers} জন
-                    </p>
-                  </td>
-
-                  {/* অতিরিক্ত সদস্য তালিকা */}
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {reg.members && reg.members.length > 1 ? (
-                      <ul className="list-disc list-inside">
-                        {reg.members.slice(1).map((m, i) => (
-                          <li key={i}>{m.member_name}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-gray-400 text-xs">নেই</span>
-                    )}
-                  </td>
-
-                  {/* Payment Status */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        reg.paymentStatus === "Paid"
-                          ? "bg-green-100 text-green-800"
-                          : reg.paymentStatus === "Pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {reg.paymentStatus}
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {filteredRegistrations.map((reg) => (
+                <div key={reg.id} className="p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">{reg.name}</h3>
+                      <p className="text-xs text-gray-500">{reg.mobile}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                      reg.paymentStatus === "Paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                    }`}>
+                      {reg.paymentStatus === "Paid" ? "পরিশোধিত" : "অপেক্ষমান"}
                     </span>
-                  </td>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 p-2 rounded-lg">
+                    <div>
+                      <span className="block text-gray-400 text-[10px] uppercase">গ্রুপ</span>
+                      <span className="font-medium">{reg.finalGroupName}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-gray-400 text-[10px] uppercase">সদস্য</span>
+                      <span className="font-bold text-gray-800">{reg.finalTotalMembers} জন</span>
+                    </div>
+                  </div>
 
-                  {/* Action Button */}
-                  {/* ডাউনলোড বাটন */}
-                  <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end pt-1">
                     <PDFDownloadLink
-                      document={
-                        <EntryCardDocument
-                          data={{
-                            ...reg,
-                            groupName: reg.finalGroupName,
-                            totalMembers: reg.finalTotalMembers,
-                          }}
-                          qrCodeUrl={reg.qrCodeUrl}
-                        />
-                      }
+                      document={<EntryCardDocument data={{...reg, groupName: reg.finalGroupName, totalMembers: reg.finalTotalMembers}} qrCodeUrl={reg.qrCodeUrl} />}
                       fileName={`card-${reg.id}.pdf`}
                     >
                       {({ loading }) => (
-                        <button
-                          className={`
-          flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-semibold transition-colors duration-200 cursor-pointer
-          ${
-            loading
-              ? "border-gray-300 text-gray-400 bg-gray-50"
-              : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100"
-          }
-        `}
-                        >
-                          {loading ? (
-                            "লোডিং..."
-                          ) : (
-                            <>
-                              {/* ছোট পিডিএফ আইকন */}
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                ></path>
-                              </svg>
-                              PDF
-                            </>
-                          )}
+                        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm active:scale-95 transition-transform">
+                          {loading ? "প্রসেসিং..." : "কার্ড ডাউনলোড করুন"}
                         </button>
                       )}
                     </PDFDownloadLink>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
-
-      {/* --- Pagination Button --- */}
     </div>
   );
 }
