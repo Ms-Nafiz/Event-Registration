@@ -29,14 +29,23 @@ export default function AdminDonationListPage() {
   const fetchData = useCallback(async () => {
     try {
       // 1. Fetch Donations
-      const dQuery = query(collection(db, "donations"), orderBy("date", "desc"));
+      const dQuery = query(
+        collection(db, "donations"),
+        orderBy("date", "desc")
+      );
       const dSnapshot = await getDocs(dQuery);
-      const dList = dSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const dList = dSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setDonations(dList);
 
       // 2. Fetch Groups
       const gSnapshot = await getDocs(collection(db, "groups"));
-      const gList = gSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const gList = gSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setGroups(gList);
 
       // 3. Calculate Summaries
@@ -75,7 +84,9 @@ export default function AdminDonationListPage() {
         }
 
         // Yearly Total
-        const dateObj = d.date?.toDate ? d.date.toDate() : new Date(d.createdAt);
+        const dateObj = d.date?.toDate
+          ? d.date.toDate()
+          : new Date(d.createdAt);
         const year = dateObj.getFullYear();
         yearTotals[year] = (yearTotals[year] || 0) + amount;
       }
@@ -93,7 +104,9 @@ export default function AdminDonationListPage() {
     const topGroup = gList.find((g) => g.id === topGroupId);
 
     // Zero Donation Groups
-    const zeroGroups = gList.filter((g) => !groupTotals[g.id] || groupTotals[g.id] === 0);
+    const zeroGroups = gList.filter(
+      (g) => !groupTotals[g.id] || groupTotals[g.id] === 0
+    );
 
     setSummary({
       topGroup: topGroup ? { ...topGroup, total: maxAmount } : null,
