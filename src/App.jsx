@@ -15,6 +15,7 @@ import UserManagementPage from "./pages/UserManagementPage";
 import Unauthorized from "./pages/Unauthorized";
 import DonationPage from "./pages/DonationPage";
 import AdminDonationUploadPage from "./pages/AdminDonationUploadPage";
+<<<<<<< HEAD
 import AdminRegistrationUploadPage from "./pages/AdminRegistrationUploadPage";
 import AdminDonationListPage from "./pages/AdminDonationListPage";
 import ContributionSummaryPage from "./pages/ContributionSummaryPage";
@@ -57,6 +58,40 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   return children;
+=======
+import AdminDonationListPage from "./pages/AdminDonationListPage";
+
+// --- পাবলিক পেজ ---
+import PublicEventRegistration from "./pages/RegistrationFormPage";
+
+// ১. গেস্ট রুট: লগইন করা থাকলে ড্যাশবোর্ডে পাঠাবে
+function GuestRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div>লোড হচ্ছে...</div>;
+  return user ? <Navigate to="/admin/dashboard" replace /> : children;
+}
+
+// ২. প্রোটেক্টেড রুট: লগইন না থাকলে লগইন পেজে পাঠাবে
+function ProtectedRoute({ children, allowedRoles = [] }) {
+    const { user, userData, loading } = useAuth();
+
+    // ১. লোডিং অবস্থায় কিছুই রেন্ডার করবেন না বা লোডার দেখান
+    if (loading) {
+        return <div className="h-screen flex items-center justify-center">লোড হচ্ছে...</div>;
+    }
+
+    // ২. ইউজার না থাকলে লগইনে পাঠান
+    if (!user) {
+        return <Navigate to="/admin/login" replace />;
+    }
+
+    // ৩. রোল চেক
+    if (allowedRoles.length > 0 && userData && !allowedRoles.includes(userData.role)) {
+        return <Unauthorized />;
+    }
+
+    return children;
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
 }
 
 function App() {
@@ -133,6 +168,7 @@ function App() {
           }
         />
         <Route
+<<<<<<< HEAD
           path="bulk-registration"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
@@ -141,6 +177,8 @@ function App() {
           }
         />
         <Route
+=======
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
           path="groups"
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
@@ -181,6 +219,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+<<<<<<< HEAD
         <Route
           path="contribution-summary"
           element={
@@ -189,6 +228,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+=======
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
       </Route>
 
       {/* ভুল লিংকে গেলে রিডাইরেক্ট */}

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
+<<<<<<< HEAD
 import { useLocation, Outlet } from "react-router-dom";
+=======
+import { useLocation, Outlet } from 'react-router-dom';
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -8,6 +12,7 @@ export default function DashboardLayout() {
   const location = useLocation();
 
   const pageTitles = {
+<<<<<<< HEAD
     "/admin/dashboard": "ড্যাশবোর্ড",
     "/admin/users": "ব্যবহারকারী",
     "/admin/scan": "QR স্ক্যানার",
@@ -22,6 +27,21 @@ export default function DashboardLayout() {
   };
 
   const currentTitle = pageTitles[location.pathname] || "অ্যাডমিন প্যানেল";
+=======
+    '/admin/dashboard': 'ড্যাশবোর্ড',
+    '/admin/users': 'ব্যবহারকারী',
+    '/admin/scan': 'QR স্ক্যানার',
+    '/admin/create-entry': 'নতুন রেজিস্ট্রেশন',
+    '/admin/list': 'রেজিস্ট্রেশন তালিকা',
+    '/admin/groups': 'গ্রুপ ম্যানেজমেন্ট',
+    '/admin/profile': 'প্রোফাইল',
+    '/admin/donate': 'ডোনেশন',
+    '/admin/bulk-donate': 'বাল্ক আপলোড',
+    '/admin/donation-list': 'ডোনেশন তালিকা',
+  };
+
+  const currentTitle = pageTitles[location.pathname] || 'অ্যাডমিন প্যানেল';
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
 
   return (
     <div className="flex h-screen bg-slate-50 font-bangla overflow-hidden">
@@ -40,6 +60,7 @@ export default function DashboardLayout() {
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-2 -ml-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
             >
+<<<<<<< HEAD
               <svg
                 className="h-6 w-6"
                 stroke="currentColor"
@@ -55,6 +76,13 @@ export default function DashboardLayout() {
               </svg>
             </button>
 
+=======
+              <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
                 {currentTitle}
@@ -74,7 +102,11 @@ export default function DashboardLayout() {
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
+<<<<<<< HEAD
             <Outlet />
+=======
+             <Outlet />
+>>>>>>> cfd48526b6770e328800d0885550f476aa254aa5
           </div>
         </div>
       </main>
