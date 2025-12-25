@@ -11,10 +11,13 @@ export default function ContributionSummaryPage() {
     totalMembers: 0,
     totalPaid: 0,
     totalPaidAmount: 0,
+    totalPaidMembers: 0,
     totalPending: 0,
     totalPendingAmount: 0,
+    totalPendingMembers: 0,
     totalWaived: 0,
     totalWaivedAmount: 0,
+    totalWaivedMembers: 0,
     totalAmount: 0,
   });
 
@@ -53,6 +56,9 @@ export default function ContributionSummaryPage() {
         let paidCount = 0;
         let pendingCount = 0;
         let waivedCount = 0;
+        let paidMembers = 0;
+        let pendingMembers = 0;
+        let waivedMembers = 0;
 
         registrationsSnapshot.forEach((doc) => {
           const data = doc.data();
@@ -70,16 +76,19 @@ export default function ContributionSummaryPage() {
               groupsMap[groupId].paidAmount += amount;
               paidCount++;
               totalPaidAmount += amount;
+              paidMembers += memberCount;
             } else if (paymentStatus === "Pending") {
               groupsMap[groupId].pendingCount++;
               groupsMap[groupId].pendingAmount += amount;
               pendingCount++;
               totalPendingAmount += amount;
+              pendingMembers += memberCount;
             } else if (paymentStatus === "Waived") {
               groupsMap[groupId].waivedCount++;
               groupsMap[groupId].waivedAmount += amount;
               waivedCount++;
               totalWaivedAmount += amount;
+              waivedMembers += memberCount;
             }
           }
 
@@ -98,10 +107,13 @@ export default function ContributionSummaryPage() {
           totalMembers: totalMems,
           totalPaid: paidCount,
           totalPaidAmount: totalPaidAmount,
+          totalPaidMembers: paidMembers,
           totalPending: pendingCount,
           totalPendingAmount: totalPendingAmount,
+          totalPendingMembers: pendingMembers,
           totalWaived: waivedCount,
           totalWaivedAmount: totalWaivedAmount,
+          totalWaivedMembers: waivedMembers,
           totalAmount: totalPaidAmount + totalPendingAmount + totalWaivedAmount,
         });
       } catch (error) {
@@ -136,99 +148,82 @@ export default function ContributionSummaryPage() {
       </div>
 
       {/* Overall Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium opacity-90">মোট রেজিস্ট্রেশন</h3>
-            <svg
-              className="w-8 h-8 opacity-80"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
+      {/* Overall Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-[#4F46E5] rounded-2xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
-          <p className="text-3xl font-bold">
-            {overallStats.totalRegistrations}
+          <h3 className="text-sm font-bold tracking-wider uppercase opacity-80 mb-1">
+            মোট চাঁদা
+          </h3>
+          <p className="text-4xl font-extrabold tracking-tight">
+            ৳{overallStats.totalAmount.toLocaleString()}
           </p>
-          <p className="text-xs opacity-75 mt-1">
-            মোট সদস্য: {overallStats.totalMembers} জন
-          </p>
+          <div className="mt-4 flex items-center gap-2 text-xs font-semibold bg-white/10 w-fit px-2 py-1 rounded-lg">
+            <span>{overallStats.totalRegistrations} রেজিস্ট্রেশন</span>
+            <span className="opacity-40">|</span>
+            <span>{overallStats.totalMembers} জন সদস্য</span>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium opacity-90">পরিশোধিত</h3>
-            <svg
-              className="w-8 h-8 opacity-80"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+        <div className="bg-[#059669] rounded-2xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-3xl font-bold">{overallStats.totalPaid}</p>
-          <p className="text-xs opacity-75 mt-1">
-            রেজিস্ট্রেশন (৳{overallStats.totalPaidAmount.toLocaleString()})
+          <h3 className="text-sm font-bold tracking-wider uppercase opacity-80 mb-1">
+            পরিশোধিত চাঁদা
+          </h3>
+          <p className="text-4xl font-extrabold tracking-tight">
+            ৳{overallStats.totalPaidAmount.toLocaleString()}
           </p>
+          <div className="mt-4 flex items-center gap-2 text-xs font-semibold bg-white/10 w-fit px-2 py-1 rounded-lg">
+            <span>{overallStats.totalPaid} রেজিস্ট্রেশন</span>
+            <span className="opacity-40">|</span>
+            <span>{overallStats.totalPaidMembers} জন সদস্য</span>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium opacity-90">অপেক্ষমান</h3>
-            <svg
-              className="w-8 h-8 opacity-80"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+        <div className="bg-[#D97706] rounded-2xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-3xl font-bold">{overallStats.totalPending}</p>
-          <p className="text-xs opacity-75 mt-1">
-            রেজিস্ট্রেশন (৳{overallStats.totalPendingAmount.toLocaleString()})
+          <h3 className="text-sm font-bold tracking-wider uppercase opacity-80 mb-1">
+            অপেক্ষমান চাঁদা
+          </h3>
+          <p className="text-4xl font-extrabold tracking-tight">
+            ৳{overallStats.totalPendingAmount.toLocaleString()}
           </p>
+          <div className="mt-4 flex items-center gap-2 text-xs font-semibold bg-white/10 w-fit px-2 py-1 rounded-lg">
+            <span>{overallStats.totalPending} রেজিস্ট্রেশন</span>
+            <span className="opacity-40">|</span>
+            <span>{overallStats.totalPendingMembers} জন সদস্য</span>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium opacity-90">মওকুফ</h3>
-            <svg
-              className="w-8 h-8 opacity-80"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+        <div className="bg-[#7C3AED] rounded-2xl p-6 text-white shadow-xl border border-white/10 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-3xl font-bold">{overallStats.totalWaived}</p>
-          <p className="text-xs opacity-75 mt-1">
-            রেজিস্ট্রেশন (৳{overallStats.totalWaivedAmount.toLocaleString()})
+          <h3 className="text-sm font-bold tracking-wider uppercase opacity-80 mb-1">
+            মওকুফ চাঁদা
+          </h3>
+          <p className="text-4xl font-extrabold tracking-tight">
+            ৳{overallStats.totalWaivedAmount.toLocaleString()}
           </p>
+          <div className="mt-4 flex items-center gap-2 text-xs font-semibold bg-white/10 w-fit px-2 py-1 rounded-lg">
+            <span>{overallStats.totalWaived} রেজিস্ট্রেশন</span>
+            <span className="opacity-40">|</span>
+            <span>{overallStats.totalWaivedMembers} জন সদস্য</span>
+          </div>
         </div>
       </div>
 
@@ -249,28 +244,28 @@ export default function ContributionSummaryPage() {
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      গ্রুপ
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      গ্রুপ নাম
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      রেজিস্ট্রেশন
+                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      মোট চাঁদা
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      সদস্য
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                       পরিশোধিত
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                       অপেক্ষমান
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                       মওকুফ
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      মোট চাঁদা
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      রেজি.
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      সদস্য
                     </th>
                   </tr>
                 </thead>
@@ -281,11 +276,51 @@ export default function ContributionSummaryPage() {
                       className="hover:bg-gray-50/80 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-bold text-gray-900">
                           {group.name}
                         </div>
                         <div className="text-xs text-gray-400">
                           {group.description}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <span className="text-sm font-black text-gray-900">
+                          ৳
+                          {(
+                            group.paidAmount +
+                            group.pendingAmount +
+                            group.waivedAmount
+                          ).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="text-sm">
+                          <div className="font-black text-green-700">
+                            ৳{group.paidAmount.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">
+                            {group.paidCount} রেজিস্ট্রেশন
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="text-sm">
+                          <div className="font-black text-amber-600">
+                            ৳{group.pendingAmount.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">
+                            {group.pendingCount} রেজিস্ট্রেশন
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="text-sm">
+                          <div className="font-black text-purple-700">
+                            ৳{group.waivedAmount.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">
+                            {group.waivedCount} রেজিস্ট্রেশন
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -298,80 +333,49 @@ export default function ContributionSummaryPage() {
                           {group.totalMembers}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-sm">
-                          <div className="font-semibold text-green-700">
-                            {group.paidCount}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            ৳{group.paidAmount.toLocaleString()}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-sm">
-                          <div className="font-semibold text-yellow-700">
-                            {group.pendingCount}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            ৳{group.pendingAmount.toLocaleString()}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-sm">
-                          <div className="font-semibold text-purple-700">
-                            {group.waivedCount}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            ৳{group.waivedAmount.toLocaleString()}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <span className="text-sm font-bold text-gray-900">
-                          ৳
-                          {(
-                            group.paidAmount +
-                            group.pendingAmount +
-                            group.waivedAmount
-                          ).toLocaleString()}
-                        </span>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-gray-100">
+                <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                   <tr>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                    <td className="px-6 py-4 text-sm font-black text-gray-900 uppercase">
                       সর্বমোট
                     </td>
-                    <td className="px-6 py-4 text-center text-sm font-bold text-gray-900">
-                      {overallStats.totalRegistrations}
+                    <td className="px-6 py-4 text-right text-sm font-black text-gray-900">
+                      ৳{overallStats.totalAmount.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-center text-sm font-bold text-gray-900">
-                      {overallStats.totalMembers}
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm font-bold text-green-700">
-                      <div>{overallStats.totalPaid}</div>
-                      <div className="text-[10px] opacity-70">
+                    <td className="px-6 py-4 text-center text-sm font-black text-green-700">
+                      <div>
                         ৳{overallStats.totalPaidAmount.toLocaleString()}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm font-bold text-yellow-700">
-                      <div>{overallStats.totalPending}</div>
                       <div className="text-[10px] opacity-70">
+                        {overallStats.totalPaid} রেজি. |{" "}
+                        {overallStats.totalPaidMembers} জন
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-black text-amber-600">
+                      <div>
                         ৳{overallStats.totalPendingAmount.toLocaleString()}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm font-bold text-purple-700">
-                      <div>{overallStats.totalWaived}</div>
                       <div className="text-[10px] opacity-70">
-                        ৳{overallStats.totalWaivedAmount.toLocaleString()}
+                        {overallStats.totalPending} রেজি. |{" "}
+                        {overallStats.totalPendingMembers} জন
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
-                      ৳{overallStats.totalAmount.toLocaleString()}
+                    <td className="px-6 py-4 text-center text-sm font-black text-purple-700">
+                      <div>
+                        ৳{overallStats.totalWaivedAmount.toLocaleString()}
+                      </div>
+                      <div className="text-[10px] opacity-70">
+                        {overallStats.totalWaived} রেজি. |{" "}
+                        {overallStats.totalWaivedMembers} জন
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-black text-gray-900">
+                      {overallStats.totalRegistrations}
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-black text-gray-900">
+                      {overallStats.totalMembers}
                     </td>
                   </tr>
                 </tfoot>
@@ -394,45 +398,11 @@ export default function ContributionSummaryPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-gray-50 p-2 rounded-lg">
-                      <span className="block text-gray-400 text-[10px] uppercase">
-                        রেজিস্ট্রেশন
+                    <div className="bg-indigo-50/50 p-2 rounded-lg">
+                      <span className="block text-indigo-600 text-[10px] font-bold uppercase mb-1">
+                        মোট চাঁদা
                       </span>
-                      <span className="font-bold text-gray-800">
-                        {group.totalRegistrations}
-                      </span>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded-lg">
-                      <span className="block text-gray-400 text-[10px] uppercase">
-                        সদস্য
-                      </span>
-                      <span className="font-bold text-gray-800">
-                        {group.totalMembers}
-                      </span>
-                    </div>
-                    <div className="bg-green-50 p-2 rounded-lg">
-                      <span className="block text-green-600 text-[10px] uppercase">
-                        পরিশোধিত
-                      </span>
-                      <span className="font-bold text-green-700">
-                        {group.paidCount} (৳{group.paidAmount.toLocaleString()})
-                      </span>
-                    </div>
-                    <div className="bg-yellow-50 p-2 rounded-lg">
-                      <span className="block text-yellow-600 text-[10px] uppercase">
-                        অপেক্ষমান
-                      </span>
-                      <span className="font-bold text-yellow-700">
-                        {group.pendingCount} (৳
-                        {group.pendingAmount.toLocaleString()})
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-gray-100">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">মোট চাঁদা</span>
-                      <span className="text-sm font-bold text-gray-900">
+                      <span className="font-black text-indigo-700 text-sm">
                         ৳
                         {(
                           group.paidAmount +
@@ -441,6 +411,54 @@ export default function ContributionSummaryPage() {
                         ).toLocaleString()}
                       </span>
                     </div>
+                    <div className="bg-green-50/50 p-2 rounded-lg border border-green-100">
+                      <span className="block text-green-600 text-[10px] font-bold uppercase mb-1">
+                        পরিশোধিত
+                      </span>
+                      <span className="font-black text-green-700">
+                        ৳{group.paidAmount.toLocaleString()}
+                      </span>
+                      <span className="block text-[9px] text-gray-400 mt-0.5">
+                        {group.paidCount} রেজিস্ট্রেশন
+                      </span>
+                    </div>
+                    <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-100">
+                      <span className="block text-amber-600 text-[10px] font-bold uppercase mb-1">
+                        অপেক্ষমান
+                      </span>
+                      <span className="font-black text-amber-700">
+                        ৳{group.pendingAmount.toLocaleString()}
+                      </span>
+                      <span className="block text-[9px] text-gray-400 mt-0.5">
+                        {group.pendingCount} রেজিস্ট্রেশন
+                      </span>
+                    </div>
+                    <div className="bg-purple-50/50 p-2 rounded-lg border border-purple-100">
+                      <span className="block text-purple-600 text-[10px] font-bold uppercase mb-1">
+                        মওকুফ
+                      </span>
+                      <span className="font-black text-purple-700">
+                        ৳{group.waivedAmount.toLocaleString()}
+                      </span>
+                      <span className="block text-[9px] text-gray-400 mt-0.5">
+                        {group.waivedCount} রেজিস্ট্রেশন
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 text-[10px] font-bold text-gray-400 uppercase pt-1 px-1">
+                    <span>
+                      রেজিস্ট্রেশন:{" "}
+                      <span className="text-gray-900">
+                        {group.totalRegistrations}
+                      </span>
+                    </span>
+                    <span>
+                      সদস্য:{" "}
+                      <span className="text-gray-900">
+                        {group.totalMembers}
+                      </span>
+                    </span>
                   </div>
                 </div>
               ))}

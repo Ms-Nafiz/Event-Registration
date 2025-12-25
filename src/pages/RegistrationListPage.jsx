@@ -14,25 +14,128 @@ import toast from "react-hot-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { EntryCardDocument } from "../components/EntryCardPDF";
 import QRCode from "qrcode";
+import React from "react";
+
+// Deferred PDF component to prevent re-renders on every page action
+const DeferredPDFDownload = React.memo(({ reg }) => {
+  const [ready, setReady] = React.useState(false);
+
+  if (!ready) {
+    return (
+      <button
+        onClick={() => setReady(true)}
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+      >
+        <span>⬇</span> PDF
+      </button>
+    );
+  }
+
+  return (
+    <PDFDownloadLink
+      document={
+        <EntryCardDocument
+          data={{
+            ...reg,
+            groupName: reg.finalGroupName,
+            totalMembers: reg.finalTotalMembers,
+          }}
+          qrCodeUrl={reg.qrCodeUrl}
+        />
+      }
+      fileName={`card-${reg.registrationId || reg.id}.pdf`}
+    >
+      {({ loading, url, error, blob }) => {
+        if (loading) {
+          return (
+            <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 text-gray-400">
+              ...
+            </button>
+          );
+        }
+        return (
+          <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+            <span>✅</span> ডাউনলোড
+          </button>
+        );
+      }}
+    </PDFDownloadLink>
+  );
+});
+
+// Mobile version of the same optimization
+const DeferredPDFDownloadMobile = React.memo(({ reg }) => {
+  const [ready, setReady] = React.useState(false);
+
+  if (!ready) {
+    return (
+      <button
+        onClick={() => setReady(true)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm active:scale-95 transition-transform"
+      >
+        কার্ড ডাউনলোড করুন
+      </button>
+    );
+  }
+
+  return (
+    <PDFDownloadLink
+      document={
+        <EntryCardDocument
+          data={{
+            ...reg,
+            groupName: reg.finalGroupName,
+            totalMembers: reg.finalTotalMembers,
+          }}
+          qrCodeUrl={reg.qrCodeUrl}
+        />
+      }
+      fileName={`card-${reg.registrationId || reg.id}.pdf`}
+    >
+      {({ loading }) => (
+        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm active:scale-95 transition-transform">
+          {loading ? "প্রসেসিং..." : "✅ ডাউনলোড শুরু করুন"}
+        </button>
+      )}
+    </PDFDownloadLink>
+  );
+});
 
 export default function RegistrationListPage() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Edit/Delete member states
+  const [groups, setGroups] = useState([]);
+  const [selectedReg, setSelectedReg] = useState(null);
+  const [selectedMemberIndex, setSelectedMemberIndex] = useState(null);
+
+  // Modals visibility
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
-  const [groups, setGroups] = useState([]);
-  const [selectedReg, setSelectedReg] = useState(null);
-  const [selectedMemberIndex, setSelectedMemberIndex] = useState(null);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showEditRegModal, setShowEditRegModal] = useState(false);
+
+  // Form states
   const [editFormData, setEditFormData] = useState({
     member_name: "",
     gender: "",
     age: "",
     t_shirt_size: "",
+  });
+  const [addMemberFormData, setAddMemberFormData] = useState({
+    member_name: "",
+    gender: "Male",
+    age: "",
+    t_shirt_size: "L",
+  });
+  const [editRegFormData, setEditRegFormData] = useState({
+    name: "",
+    mobile: "",
+    email: "",
+    contributeAmount: "",
   });
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [expandedRow, setExpandedRow] = useState(null);
@@ -114,19 +217,17 @@ export default function RegistrationListPage() {
       const updatedMembers = [...selectedReg.members];
       updatedMembers[selectedMemberIndex] = editFormData;
 
-      // ✅ যদি প্রথম member edit করা হয়, main name ও update করা
       const updateData = {
         members: updatedMembers,
       };
 
       if (selectedMemberIndex === 0) {
-        updateData.name = editFormData.member_name; // Main name sync করা
+        updateData.name = editFormData.member_name;
       }
 
       const regRef = doc(db, "registrations", selectedReg.firebaseDocId);
       await updateDoc(regRef, updateData);
 
-      // Update local state
       setRegistrations(
         registrations.map((r) =>
           r.firebaseDocId === selectedReg.firebaseDocId
@@ -143,6 +244,115 @@ export default function RegistrationListPage() {
 
       toast.success("সদস্য সফলভাবে আপডেট করা হয়েছে!");
       setShowEditModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("আপডেট ব্যর্থ হয়েছে।");
+    }
+  };
+
+  // Open Add Member Modal
+  const openAddMemberModal = (reg) => {
+    setSelectedReg(reg);
+    setAddMemberFormData({
+      member_name: "",
+      gender: "Male",
+      age: "",
+      t_shirt_size: "L",
+    });
+    setShowAddMemberModal(true);
+  };
+
+  // Handle Add Member
+  const handleAddMember = async () => {
+    try {
+      if (!addMemberFormData.member_name) {
+        toast.error("সদস্যের নাম আবশ্যক");
+        return;
+      }
+
+      const updatedMembers = [
+        ...(selectedReg.members || []),
+        addMemberFormData,
+      ];
+      const newTotalMembers = updatedMembers.length;
+
+      const regRef = doc(db, "registrations", selectedReg.firebaseDocId);
+      await updateDoc(regRef, {
+        members: updatedMembers,
+        totalMembers: newTotalMembers,
+      });
+
+      setRegistrations(
+        registrations.map((r) =>
+          r.firebaseDocId === selectedReg.firebaseDocId
+            ? {
+                ...r,
+                members: updatedMembers,
+                totalMembers: newTotalMembers,
+                finalTotalMembers: newTotalMembers,
+              }
+            : r
+        )
+      );
+
+      toast.success("নতুন সদস্য যুক্ত করা হয়েছে!");
+      setShowAddMemberModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("সদস্য যুক্ত করতে সমস্যা হয়েছে।");
+    }
+  };
+
+  // Open Edit Registration Modal
+  const openEditRegModal = (reg) => {
+    setSelectedReg(reg);
+    setEditRegFormData({
+      name: reg.name || "",
+      mobile: reg.mobile || "",
+      email: reg.email || "",
+      contributeAmount: reg.contributeAmount || "",
+    });
+    setShowEditRegModal(true);
+  };
+
+  // Handle Edit Registration
+  const handleEditRegistration = async () => {
+    try {
+      const regRef = doc(db, "registrations", selectedReg.firebaseDocId);
+
+      // Update main registration data
+      const updateData = {
+        name: editRegFormData.name,
+        mobile: editRegFormData.mobile,
+        email: editRegFormData.email,
+        contributeAmount: editRegFormData.contributeAmount,
+      };
+
+      // Also update the name of the first member if it exists
+      let updatedMembers = [...(selectedReg.members || [])];
+      if (updatedMembers.length > 0) {
+        updatedMembers[0] = {
+          ...updatedMembers[0],
+          member_name: editRegFormData.name,
+        };
+        updateData.members = updatedMembers;
+      }
+
+      await updateDoc(regRef, updateData);
+
+      setRegistrations(
+        registrations.map((r) =>
+          r.firebaseDocId === selectedReg.firebaseDocId
+            ? {
+                ...r,
+                ...updateData,
+              }
+            : r
+        )
+      );
+
+      toast.success("রেজিস্ট্রেশন তথ্য সফলভাবে আপডেট করা হয়েছে!");
+      setShowEditRegModal(false);
     } catch (error) {
       console.error(error);
       toast.error("আপডেট ব্যর্থ হয়েছে।");
@@ -229,6 +439,49 @@ export default function RegistrationListPage() {
     } catch (error) {
       console.error(error);
       toast.error("গ্রুপ আপডেট ব্যর্থ হয়েছে।");
+    }
+  };
+
+  // Handle Toggle Check-in
+  const handleToggleCheckIn = async (reg) => {
+    const isConfirm = window.confirm(
+      reg.checkedIn
+        ? `আপনি কি ${reg.name}-এর চেক-ইন বাতিল করতে চান?`
+        : `আপনি কি ${reg.name}-কে চেক-ইন করাতে চান?`
+    );
+
+    if (!isConfirm) return;
+
+    try {
+      const newStatus = !reg.checkedIn;
+      const regRef = doc(db, "registrations", reg.firebaseDocId);
+
+      await updateDoc(regRef, {
+        checkedIn: newStatus,
+        checkInTime: newStatus ? new Date() : null,
+      });
+
+      // Update local state
+      setRegistrations(
+        registrations.map((r) =>
+          r.firebaseDocId === reg.firebaseDocId
+            ? {
+                ...r,
+                checkedIn: newStatus,
+                checkInTime: newStatus ? new Date() : null,
+              }
+            : r
+        )
+      );
+
+      toast.success(
+        newStatus
+          ? `${reg.name} সফলভাবে চেক-ইন করা হয়েছে!`
+          : `${reg.name} চেক-ইন বাতিল করা হয়েছে!`
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error("চেক-ইন স্ট্যাটাস আপডেট ব্যর্থ হয়েছে।");
     }
   };
 
@@ -381,6 +634,9 @@ export default function RegistrationListPage() {
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       স্ট্যাটাস
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      এন্ট্রি
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       অ্যাকশন
                     </th>
@@ -394,8 +650,27 @@ export default function RegistrationListPage() {
                         className="hover:bg-gray-50/80 transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                             {reg.name}
+                            <button
+                              onClick={() => openEditRegModal(reg)}
+                              className="text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="তথ্য সম্পাদনা"
+                            >
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                />
+                              </svg>
+                            </button>
                           </div>
                           <div className="text-xs text-gray-400">
                             {reg.mobile}
@@ -474,40 +749,20 @@ export default function RegistrationListPage() {
                               : "অপেক্ষমান"}
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <PDFDownloadLink
-                            document={
-                              <EntryCardDocument
-                                data={{
-                                  ...reg,
-                                  groupName: reg.finalGroupName,
-                                  totalMembers: reg.finalTotalMembers,
-                                }}
-                                qrCodeUrl={reg.qrCodeUrl}
-                              />
-                            }
-                            fileName={`card-${
-                              reg.registrationId || reg.id
-                            }.pdf`}
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => handleToggleCheckIn(reg)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all shadow-sm ${
+                              reg.checkedIn
+                                ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                            }`}
                           >
-                            {({ loading }) => (
-                              <button
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                                  loading
-                                    ? "bg-gray-100 text-gray-400"
-                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                                }`}
-                              >
-                                {loading ? (
-                                  "..."
-                                ) : (
-                                  <>
-                                    <span>⬇</span> PDF
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </PDFDownloadLink>
+                            {reg.checkedIn ? "✅ Entered" : "❌ No Entry"}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <DeferredPDFDownload reg={reg} />
                         </td>
                       </tr>
 
@@ -516,9 +771,17 @@ export default function RegistrationListPage() {
                         <tr>
                           <td colSpan="6" className="px-6 py-4 bg-gray-50">
                             <div className="space-y-2">
-                              <p className="text-xs font-bold text-gray-600 uppercase mb-3">
-                                সদস্য তালিকা
-                              </p>
+                              <div className="flex justify-between items-center mb-3">
+                                <p className="text-xs font-bold text-gray-600 uppercase">
+                                  সদস্য তালিকা
+                                </p>
+                                <button
+                                  onClick={() => openAddMemberModal(reg)}
+                                  className="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 rounded text-[10px] font-bold transition-colors"
+                                >
+                                  <span>➕</span> সদস্য যুক্ত করুন
+                                </button>
+                              </div>
                               {reg.members.map((member, idx) => (
                                 <div
                                   key={idx}
@@ -596,22 +859,35 @@ export default function RegistrationListPage() {
                       </h3>
                       <p className="text-xs text-gray-500">{reg.mobile}</p>
                     </div>
-                    <button
-                      onClick={() => openPaymentModal(reg)}
-                      className={`px-2 py-0.5 text-[10px] font-bold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
-                        reg.paymentStatus === "Paid"
-                          ? "bg-green-100 text-green-700"
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => openPaymentModal(reg)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold ${
+                          reg.paymentStatus === "Paid"
+                            ? "bg-green-100 text-green-700"
+                            : reg.paymentStatus === "Waived"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
+                      >
+                        {reg.paymentStatus === "Paid"
+                          ? "পরিশোধিত"
                           : reg.paymentStatus === "Waived"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {reg.paymentStatus === "Paid"
-                        ? "পরিশোধিত"
-                        : reg.paymentStatus === "Waived"
-                        ? "মওকুফ"
-                        : "অপেক্ষমান"}
-                    </button>
+                          ? "মওকুফ"
+                          : "অপেক্ষমান"}
+                      </button>
+
+                      <button
+                        onClick={() => handleToggleCheckIn(reg)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
+                          reg.checkedIn
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            : "bg-white border-gray-200 text-gray-500"
+                        }`}
+                      >
+                        {reg.checkedIn ? "✅ এন্ট্রি হয়েছে" : "🔘 এন্ট্রি নেই"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 p-2 rounded-lg">
@@ -632,25 +908,7 @@ export default function RegistrationListPage() {
                   </div>
 
                   <div className="flex justify-end pt-1">
-                    <PDFDownloadLink
-                      document={
-                        <EntryCardDocument
-                          data={{
-                            ...reg,
-                            groupName: reg.finalGroupName,
-                            totalMembers: reg.finalTotalMembers,
-                          }}
-                          qrCodeUrl={reg.qrCodeUrl}
-                        />
-                      }
-                      fileName={`card-${reg.registrationId || reg.id}.pdf`}
-                    >
-                      {({ loading }) => (
-                        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm active:scale-95 transition-transform">
-                          {loading ? "প্রসেসিং..." : "কার্ড ডাউনলোড করুন"}
-                        </button>
-                      )}
-                    </PDFDownloadLink>
+                    <DeferredPDFDownloadMobile reg={reg} />
                   </div>
                 </div>
               ))}
@@ -981,6 +1239,210 @@ export default function RegistrationListPage() {
               </button>
               <button
                 onClick={handleGroupUpdate}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                আপডেট করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4 font-bangla">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-fade-in text-left">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              নতুন সদস্য যুক্ত করুন
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  নাম <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addMemberFormData.member_name}
+                  onChange={(e) =>
+                    setAddMemberFormData({
+                      ...addMemberFormData,
+                      member_name: e.target.value,
+                    })
+                  }
+                  placeholder="সদস্যের নাম লিখুন"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  লিঙ্গ
+                </label>
+                <select
+                  value={addMemberFormData.gender}
+                  onChange={(e) =>
+                    setAddMemberFormData({
+                      ...addMemberFormData,
+                      gender: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Male">ছেলে/পুরুষ</option>
+                  <option value="Female">মেয়ে/মহিলা</option>
+                  <option value="Child">শিশু</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  বয়স
+                </label>
+                <input
+                  type="text"
+                  value={addMemberFormData.age}
+                  onChange={(e) =>
+                    setAddMemberFormData({
+                      ...addMemberFormData,
+                      age: e.target.value,
+                    })
+                  }
+                  placeholder="বয়স লিখুন"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  টি-শার্ট সাইজ
+                </label>
+                <select
+                  value={addMemberFormData.t_shirt_size}
+                  onChange={(e) =>
+                    setAddMemberFormData({
+                      ...addMemberFormData,
+                      t_shirt_size: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                  <option value="XXL">XXL</option>
+                  <option value="NA">NA (শিশু)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowAddMemberModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                বাতিল
+              </button>
+              <button
+                onClick={handleAddMember}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                যুক্ত করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Registration Modal */}
+      {showEditRegModal && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50 p-4 font-bangla">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-fade-in text-left">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">
+              রেজিস্ট্রেশন তথ্য সম্পাদনা
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  প্রতিনিধির নাম
+                </label>
+                <input
+                  type="text"
+                  value={editRegFormData.name}
+                  onChange={(e) =>
+                    setEditRegFormData({
+                      ...editRegFormData,
+                      name: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  মোবাইল নম্বর
+                </label>
+                <input
+                  type="text"
+                  value={editRegFormData.mobile}
+                  onChange={(e) =>
+                    setEditRegFormData({
+                      ...editRegFormData,
+                      mobile: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ইমেইল
+                </label>
+                <input
+                  type="email"
+                  value={editRegFormData.email}
+                  onChange={(e) =>
+                    setEditRegFormData({
+                      ...editRegFormData,
+                      email: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  চাঁদার পরিমাণ
+                </label>
+                <input
+                  type="number"
+                  value={editRegFormData.contributeAmount}
+                  onChange={(e) =>
+                    setEditRegFormData({
+                      ...editRegFormData,
+                      contributeAmount: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowEditRegModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                বাতিল
+              </button>
+              <button
+                onClick={handleEditRegistration}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 আপডেট করুন
