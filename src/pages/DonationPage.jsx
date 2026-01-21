@@ -5,35 +5,31 @@ import {
   collection,
   addDoc,
   query,
-  where,
   getDocs,
+  orderBy,
+  onSnapshot,
   Timestamp,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
+import Select from "react-select";
 
 export default function DonationPage() {
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("manual");
   const [loading, setLoading] = useState(false);
   const [donations, setDonations] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [selectedMember, setSelectedMember] = useState(null);
 
   const fetchDonations = useCallback(async () => {
     if (!user) return;
     try {
-      const q = query(
-        collection(db, "donations"),
-        where("uid", "==", user.uid)
-      );
+      // Fetch all donations if admin, otherwise just the ones they recorded?
+      // For now, let's stick to simple list of all donations since this is a family portal
+      const q = query(collection(db, "donations"), orderBy("date", "desc"));
       const snapshot = await getDocs(q);
       const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-      // Client-side sorting
-      list.sort((a, b) => {
-        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.createdAt);
-        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.createdAt);
-        return dateB - dateA;
-      });
       setDonations(list);
     } catch (error) {
       console.error("Error fetching donations:", error);
@@ -41,7 +37,19 @@ export default function DonationPage() {
   }, [user]);
 
   useEffect(() => {
+    // Fetch Members for selection
+    const qMembers = query(collection(db, "members"), orderBy("name"));
+    const unsubscribeMembers = onSnapshot(qMembers, (querySnapshot) => {
+      const membersData = [];
+      querySnapshot.forEach((doc) => {
+        membersData.push({ id: doc.id, ...doc.data() });
+      });
+      setMembers(membersData);
+    });
+
     fetchDonations();
+
+    return () => unsubscribeMembers();
   }, [fetchDonations]);
 
   const handleDonate = async (e) => {
@@ -69,15 +77,20 @@ export default function DonationPage() {
         monthNames[date.getMonth()]
       } ${date.getFullYear()}`;
 
+      if (!selectedMember)
+        return toast.error("দয়া করে একজন সদস্য নির্বাচন করুন।");
+
       await addDoc(collection(db, "donations"), {
-        uid: user.uid,
-        userName: userData?.name || user.displayName || "Unknown",
-        groupId: userData?.groupId || "N/A",
+        memberId: selectedMember.value,
+        userName: selectedMember.label, // Full Name (Display ID)
+        memberDisplayId: selectedMember.displayId,
+        groupId: selectedMember.groupId || "N/A",
         amount: Number(amount),
         date: Timestamp.fromDate(date),
         month: currentMonth,
         paymentMethod: paymentMethod,
         status: "pending",
+        recordedBy: user.uid,
         createdAt: date.toISOString(),
       });
 
@@ -105,7 +118,34 @@ export default function DonationPage() {
             <h2 className="text-md font-semibold text-gray-700 mb-3 border-b pb-2">
               নতুন ডোনেশন
             </h2>
-            <form onSubmit={handleDonate} className="space-y-3">
+            <form onSubmit={handleDonate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  সদস্য নির্বাচন করুন
+                </label>
+                <Select
+                  options={members.map((m) => ({
+                    value: m.uniqueId,
+                    label: `${m.name} (${m.displayId || m.uniqueId})`,
+                    displayId: m.displayId || m.uniqueId,
+                    groupId: m.groupid,
+                  }))}
+                  value={selectedMember}
+                  onChange={setSelectedMember}
+                  placeholder="সদস্য খুঁজুন..."
+                  isSearchable
+                  noOptionsMessage={() => "কোনো সদস্য পাওয়া যায়নি"}
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      fontSize: "13px",
+                      borderRadius: "0.5rem",
+                      borderColor: "#e2e8f0",
+                    }),
+                  }}
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   টাকার পরিমাণ
@@ -175,6 +215,9 @@ export default function DonationPage() {
                       তারিখ
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      সদস্য ও আইডি
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       মাস
                     </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -203,8 +246,16 @@ export default function DonationPage() {
                       >
                         <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-600">
                           {d.date?.toDate
-                            ? d.date.toDate().toLocaleDateString()
-                            : new Date(d.createdAt).toLocaleDateString()}
+                            ? d.date.toDate().toLocaleDateString("bn-BD")
+                            : new Date(d.createdAt).toLocaleDateString("bn-BD")}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="text-xs font-bold text-gray-800">
+                            {d.userName}
+                          </div>
+                          <div className="text-[10px] text-indigo-600 font-medium">
+                            {d.memberDisplayId || d.uniqueId}
+                          </div>
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-600">
                           {d.month}

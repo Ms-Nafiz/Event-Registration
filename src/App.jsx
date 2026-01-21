@@ -18,6 +18,8 @@ import AdminDonationUploadPage from "./pages/AdminDonationUploadPage";
 import AdminRegistrationUploadPage from "./pages/AdminRegistrationUploadPage";
 import AdminDonationListPage from "./pages/AdminDonationListPage";
 import ContributionSummaryPage from "./pages/ContributionSummaryPage";
+import FamilyMembersPage from "./pages/FamilyMembersPage";
+import AdminFamilyUploadPage from "./pages/AdminFamilyUploadPage";
 
 // --- পাবলিক পেজ ---
 import PublicEventRegistration from "./pages/RegistrationFormPage";
@@ -186,6 +188,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <ContributionSummaryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="members"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "user"]}>
+              <FamilyMembersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="bulk-members-upload"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminFamilyUploadPage />
             </ProtectedRoute>
           }
         />

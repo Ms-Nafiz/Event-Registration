@@ -45,7 +45,7 @@ const DeferredPDFDownload = React.memo(({ reg }) => {
       }
       fileName={`card-${reg.registrationId || reg.id}.pdf`}
     >
-      {({ loading, url, error, blob }) => {
+      {({ loading }) => {
         if (loading) {
           return (
             <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 text-gray-400">
@@ -157,7 +157,7 @@ export default function RegistrationListPage() {
 
         const q = query(
           collection(db, "registrations"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
         const querySnapshot = await getDocs(q);
 
@@ -181,10 +181,10 @@ export default function RegistrationListPage() {
           data.map(async (item) => {
             // ✅ Custom HF-xxxxx ID দিয়ে QR code তৈরি
             const qrUrl = await QRCode.toDataURL(
-              item.registrationId || item.id
+              item.registrationId || item.id,
             );
             return { ...item, qrCodeUrl: qrUrl };
-          })
+          }),
         );
 
         setRegistrations(dataWithQR);
@@ -238,8 +238,8 @@ export default function RegistrationListPage() {
                   name: editFormData.member_name,
                 }),
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success("সদস্য সফলভাবে আপডেট করা হয়েছে!");
@@ -291,8 +291,8 @@ export default function RegistrationListPage() {
                 totalMembers: newTotalMembers,
                 finalTotalMembers: newTotalMembers,
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success("নতুন সদস্য যুক্ত করা হয়েছে!");
@@ -347,8 +347,8 @@ export default function RegistrationListPage() {
                 ...r,
                 ...updateData,
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success("রেজিস্ট্রেশন তথ্য সফলভাবে আপডেট করা হয়েছে!");
@@ -385,16 +385,16 @@ export default function RegistrationListPage() {
         registrations.map((r) =>
           r.firebaseDocId === selectedReg.firebaseDocId
             ? { ...r, paymentStatus: newStatus }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success(
         newStatus === "Paid"
           ? "পেমেন্ট সফলভাবে পরিশোধিত হিসেবে চিহ্নিত করা হয়েছে!"
           : newStatus === "Waived"
-          ? "পেমেন্ট মওকুফ হিসেবে চিহ্নিত করা হয়েছে!"
-          : "পেমেন্ট অপেক্ষমান হিসেবে চিহ্নিত করা হয়েছে!"
+            ? "পেমেন্ট মওকুফ হিসেবে চিহ্নিত করা হয়েছে!"
+            : "পেমেন্ট অপেক্ষমান হিসেবে চিহ্নিত করা হয়েছে!",
       );
       setShowPaymentModal(false);
     } catch (error) {
@@ -430,8 +430,8 @@ export default function RegistrationListPage() {
                 group_id: selectedGroupId,
                 finalGroupName: updatedGroupName,
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success("গ্রুপ সফলভাবে আপডেট করা হয়েছে!");
@@ -447,7 +447,7 @@ export default function RegistrationListPage() {
     const isConfirm = window.confirm(
       reg.checkedIn
         ? `আপনি কি ${reg.name}-এর চেক-ইন বাতিল করতে চান?`
-        : `আপনি কি ${reg.name}-কে চেক-ইন করাতে চান?`
+        : `আপনি কি ${reg.name}-কে চেক-ইন করাতে চান?`,
     );
 
     if (!isConfirm) return;
@@ -470,14 +470,14 @@ export default function RegistrationListPage() {
                 checkedIn: newStatus,
                 checkInTime: newStatus ? new Date() : null,
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success(
         newStatus
           ? `${reg.name} সফলভাবে চেক-ইন করা হয়েছে!`
-          : `${reg.name} চেক-ইন বাতিল করা হয়েছে!`
+          : `${reg.name} চেক-ইন বাতিল করা হয়েছে!`,
       );
     } catch (error) {
       console.error(error);
@@ -496,8 +496,8 @@ export default function RegistrationListPage() {
         // Remove from local state
         setRegistrations(
           registrations.filter(
-            (r) => r.firebaseDocId !== selectedReg.firebaseDocId
-          )
+            (r) => r.firebaseDocId !== selectedReg.firebaseDocId,
+          ),
         );
 
         toast.success("মূল সদস্য এবং সকল তথ্য মুছে ফেলা হয়েছে!");
@@ -507,7 +507,7 @@ export default function RegistrationListPage() {
 
       // ✅ For other members, just remove from array
       const updatedMembers = selectedReg.members.filter(
-        (_, idx) => idx !== selectedMemberIndex
+        (_, idx) => idx !== selectedMemberIndex,
       );
       const newTotalMembers = updatedMembers.length;
 
@@ -527,8 +527,8 @@ export default function RegistrationListPage() {
                 totalMembers: newTotalMembers,
                 finalTotalMembers: newTotalMembers,
               }
-            : r
-        )
+            : r,
+        ),
       );
 
       toast.success("সদস্য সফলভাবে মুছে ফেলা হয়েছে!");
@@ -545,7 +545,7 @@ export default function RegistrationListPage() {
       reg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reg.mobile.includes(searchTerm) ||
       (reg.finalGroupName &&
-        reg.finalGroupName.toLowerCase().includes(searchTerm.toLowerCase()))
+        reg.finalGroupName.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
   return (
@@ -562,7 +562,7 @@ export default function RegistrationListPage() {
               মোট সদস্য:{" "}
               {filteredRegistrations.reduce(
                 (acc, reg) => acc + (reg.finalTotalMembers || 0),
-                0
+                0,
               )}
             </span>
           </p>
@@ -705,7 +705,7 @@ export default function RegistrationListPage() {
                             <button
                               onClick={() =>
                                 setExpandedRow(
-                                  expandedRow === reg.id ? null : reg.id
+                                  expandedRow === reg.id ? null : reg.id,
                                 )
                               }
                               className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
@@ -738,15 +738,15 @@ export default function RegistrationListPage() {
                               reg.paymentStatus === "Paid"
                                 ? "bg-green-100 text-green-700"
                                 : reg.paymentStatus === "Waived"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-yellow-100 text-yellow-700"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
                             {reg.paymentStatus === "Paid"
                               ? "পরিশোধিত"
                               : reg.paymentStatus === "Waived"
-                              ? "মওকুফ"
-                              : "অপেক্ষমান"}
+                                ? "মওকুফ"
+                                : "অপেক্ষমান"}
                           </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -866,15 +866,15 @@ export default function RegistrationListPage() {
                           reg.paymentStatus === "Paid"
                             ? "bg-green-100 text-green-700"
                             : reg.paymentStatus === "Waived"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-yellow-100 text-yellow-700"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
                         {reg.paymentStatus === "Paid"
                           ? "পরিশোধিত"
                           : reg.paymentStatus === "Waived"
-                          ? "মওকুফ"
-                          : "অপেক্ষমান"}
+                            ? "মওকুফ"
+                            : "অপেক্ষমান"}
                       </button>
 
                       <button
@@ -1122,15 +1122,15 @@ export default function RegistrationListPage() {
                     selectedReg.paymentStatus === "Paid"
                       ? "bg-green-100 text-green-700"
                       : selectedReg.paymentStatus === "Waived"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-yellow-100 text-yellow-700"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
                   {selectedReg.paymentStatus === "Paid"
                     ? "পরিশোধিত"
                     : selectedReg.paymentStatus === "Waived"
-                    ? "মওকুফ"
-                    : "অপেক্ষমান"}
+                      ? "মওকুফ"
+                      : "অপেক্ষমান"}
                 </span>
               </div>
             </div>

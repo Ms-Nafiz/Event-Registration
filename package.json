@@ -23,6 +23,8 @@
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.5",
+    "react-select": "^5.10.2",
+    "reactflow": "^11.11.4",
     "tailwindcss": "^4.1.16",
     "xlsx": "^0.18.5"
   },
@@ -35,6 +37,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
+    "rollup-plugin-visualizer": "^6.0.5",
     "vite": "^7.1.7"
   }
 }

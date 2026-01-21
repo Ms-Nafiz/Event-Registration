@@ -19,6 +19,8 @@ export default function DashboardLayout() {
     "/admin/bulk-donate": "বাল্ক আপলোড",
     "/admin/donation-list": "ডোনেশন তালিকা",
     "/admin/contribution-summary": "চাঁদা সারাংশ",
+    "/admin/members": "বংশ সদস্য তালিকা",
+    "/admin/bulk-members-upload": "সদস্য আপলোড",
   };
 
   const currentTitle = pageTitles[location.pathname] || "অ্যাডমিন প্যানেল";

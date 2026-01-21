@@ -1,0 +1,1 @@
+const e=String.raw,o=e`(?:\p{Emoji}\uFE0F\u20E3?|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Presentation})`,E=e`\u{E0061}-\u{E007A}`,u=()=>new RegExp(e`[\u{1F1E6}-\u{1F1FF}]{2}|\u{1F3F4}[${E}]{2}[\u{E0030}-\u{E0039}${E}]{1,3}\u{E007F}|${o}(?:\u200D${o})*`,"gu");export{u as e};

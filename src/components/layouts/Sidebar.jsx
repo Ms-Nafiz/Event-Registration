@@ -43,6 +43,18 @@ const SidebarContent = ({
     { name: "রেজিস্ট্রেশন", path: "/admin/list", icon: "👥", roles: ["admin"] },
     { name: "গ্রুপ", path: "/admin/groups", icon: "📦", roles: ["admin"] },
     { name: "ব্যবহারকারী", path: "/admin/users", icon: "⚙️", roles: ["admin"] },
+    {
+      name: "বংশ সদস্য",
+      path: "/admin/members",
+      icon: "🌳",
+      roles: ["admin", "user"],
+    },
+    {
+      name: "সদস্য আপলোড",
+      path: "/admin/bulk-members-upload",
+      icon: "📤",
+      roles: ["admin"],
+    },
 
     // Donation
     {
