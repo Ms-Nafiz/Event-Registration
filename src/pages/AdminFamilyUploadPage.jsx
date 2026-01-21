@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, writeBatch, doc } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 
@@ -8,6 +8,23 @@ export default function AdminFamilyUploadPage() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState([]);
+  const [groups, setGroups] = useState([]);
+
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "groups"));
+        const groupsList = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          name: doc.data().name,
+        }));
+        setGroups(groupsList);
+      } catch (error) {
+        console.error("Error fetching groups:", error);
+      }
+    };
+    fetchGroups();
+  }, []);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -50,7 +67,7 @@ export default function AdminFamilyUploadPage() {
         const displayId = `G${gen}-${randomId}`;
         const newDocRef = doc(membersRef);
 
-        batch.set(newDocRef, {
+        const saveData = {
           uniqueId: uniqueId,
           displayId: displayId,
           name: name,
@@ -74,7 +91,29 @@ export default function AdminFamilyUploadPage() {
           phone: row["Phone"] || row["মোবাইল"] || "",
           address: row["Address"] || row["ঠিকানা"] || "",
           gender: row["Gender"] || row["লিঙ্গ"] || "Male",
-          groupid: row["Group ID"] || row["গ্রুপ আইডি"] || "",
+          groupid: "",
+          birthdate: row["Birthdate"] || row["জন্ম তারিখ"] || "",
+        };
+
+        // Group Lookup
+        const groupName =
+          row["Group Name"] ||
+          row["গ্রুপের নাম"] ||
+          row["Group"] ||
+          row["গ্রুপ"];
+        const groupIdFromExcel = row["Group ID"] || row["গ্রুপ আইডি"];
+
+        if (groupIdFromExcel) {
+          saveData.groupid = groupIdFromExcel;
+        } else if (groupName) {
+          const group = groups.find(
+            (g) => g.name?.toLowerCase() === groupName.toString().toLowerCase(),
+          );
+          if (group) saveData.groupid = group.id;
+        }
+
+        batch.set(newDocRef, {
+          ...saveData,
           birthYear: row["Birth Year"] ? parseInt(row["Birth Year"]) : null,
           deathYear: row["Death Year"] ? parseInt(row["Death Year"]) : null,
           alive:
@@ -115,6 +154,8 @@ export default function AdminFamilyUploadPage() {
         Phone: "017XXXXXXXX",
         Address: "ঢাকা, বাংলাদেশ",
         Generation: 1,
+        "Group Name": "A Group",
+        Birthdate: "1950-01-01",
       },
       {
         Name: "আরিফুল ইসলাম",
@@ -128,6 +169,8 @@ export default function AdminFamilyUploadPage() {
         Generation: 2,
         "Spouse IDs": "M-YYYYYY",
         "Children IDs": "M-ZZZZZZ",
+        "Group Name": "A Group",
+        Birthdate: "1980-06-15",
       },
     ];
     const worksheet = XLSX.utils.json_to_sheet(data);

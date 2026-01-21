@@ -172,12 +172,16 @@ export default function RegistrationListPage() {
     gender: "",
     age: "",
     t_shirt_size: "",
+    birthYear: "",
+    birthdate: "",
   });
   const [addMemberFormData, setAddMemberFormData] = useState({
     member_name: "",
     gender: "Male",
     age: "",
     t_shirt_size: "L",
+    birthYear: "",
+    birthdate: "",
   });
   const [editRegFormData, setEditRegFormData] = useState({
     name: "",
@@ -238,6 +242,8 @@ export default function RegistrationListPage() {
       gender: member.gender || "",
       age: member.age || "",
       t_shirt_size: member.t_shirt_size || "",
+      birthYear: member.birthYear || "",
+      birthdate: member.birthdate || "",
     });
     setShowEditModal(true);
   };
@@ -275,6 +281,8 @@ export default function RegistrationListPage() {
       gender: "Male",
       age: "",
       t_shirt_size: "L",
+      birthYear: "",
+      birthdate: "",
     });
     setShowAddMemberModal(true);
   };
@@ -730,6 +738,14 @@ export default function RegistrationListPage() {
                                     <p className="text-xs text-gray-500">
                                       {member.gender} • {member.age} বছর •
                                       টি-শার্ট: {member.t_shirt_size}
+                                      {(member.birthYear ||
+                                        member.birthdate) && (
+                                        <>
+                                          {" "}
+                                          •{" "}
+                                          {member.birthYear || member.birthdate}
+                                        </>
+                                      )}
                                     </p>
                                   </div>
                                   <div className="flex gap-2">

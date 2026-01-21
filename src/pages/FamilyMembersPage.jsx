@@ -35,8 +35,8 @@ const customSelectStyles = {
     backgroundColor: state.isSelected
       ? "#6366f1"
       : state.isFocused
-      ? "#f1f5f9"
-      : "white",
+        ? "#f1f5f9"
+        : "white",
     color: state.isSelected ? "white" : "#1e293b",
     padding: "0.5rem 1rem",
     fontSize: "0.875rem",
@@ -85,6 +85,7 @@ export default function FamilyMembersPage() {
     alive: true,
     profession: "",
     photoUrl: "",
+    birthdate: "",
   };
   const [formData, setFormData] = useState(initialFormData);
 
@@ -92,7 +93,7 @@ export default function FamilyMembersPage() {
     // Fetch Members
     const qMembers = query(
       collection(db, "members"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
     const unsubscribeMembers = onSnapshot(qMembers, (querySnapshot) => {
       const membersData = [];
@@ -118,7 +119,7 @@ export default function FamilyMembersPage() {
         console.error("Error fetching groups:", error);
         toast.error("সদস্য বা গ্রুপ তালিকা লোড করতে সমস্যা হয়েছে।");
         setLoading(false);
-      }
+      },
     );
 
     return () => {
@@ -137,7 +138,8 @@ export default function FamilyMembersPage() {
       if (formData.fatherId || formData.motherId) {
         const parent = members.find(
           (m) =>
-            m.uniqueId === formData.fatherId || m.uniqueId === formData.motherId
+            m.uniqueId === formData.fatherId ||
+            m.uniqueId === formData.motherId,
         );
         if (parent) {
           calcGen = (parent.generation || 0) + 1;
@@ -218,6 +220,7 @@ export default function FamilyMembersPage() {
       alive: member.alive !== undefined ? member.alive : true,
       profession: member.profession || "",
       photoUrl: member.photoUrl || "",
+      birthdate: member.birthdate || "",
     });
     setIsModalOpen(true);
   };
@@ -442,10 +445,10 @@ export default function FamilyMembersPage() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredMembers.map((member) => {
                   const father = members.find(
-                    (m) => m.uniqueId === member.fatherId
+                    (m) => m.uniqueId === member.fatherId,
                   );
                   const mother = members.find(
-                    (m) => m.uniqueId === member.motherId
+                    (m) => m.uniqueId === member.motherId,
                   );
 
                   return (
@@ -483,7 +486,7 @@ export default function FamilyMembersPage() {
                                 if (!mGroupId) return "গ্রুপ নেই";
                                 const g = groups.find(
                                   (gp) =>
-                                    gp.id == mGroupId || gp.name == mGroupId
+                                    gp.id == mGroupId || gp.name == mGroupId,
                                 );
                                 return g
                                   ? `গ্রুপ: ${g.name}`
@@ -705,11 +708,11 @@ export default function FamilyMembersPage() {
                             value: formData.fatherId,
                             label:
                               (members.find(
-                                (m) => m.uniqueId === formData.fatherId
+                                (m) => m.uniqueId === formData.fatherId,
                               )?.name || "") +
                               ` (${
                                 members.find(
-                                  (m) => m.uniqueId === formData.fatherId
+                                  (m) => m.uniqueId === formData.fatherId,
                                 )?.displayId || formData.fatherId
                               })`,
                           }
@@ -745,11 +748,11 @@ export default function FamilyMembersPage() {
                             value: formData.motherId,
                             label:
                               (members.find(
-                                (m) => m.uniqueId === formData.motherId
+                                (m) => m.uniqueId === formData.motherId,
                               )?.name || "") +
                               ` (${
                                 members.find(
-                                  (m) => m.uniqueId === formData.motherId
+                                  (m) => m.uniqueId === formData.motherId,
                                 )?.displayId || formData.motherId
                               })`,
                           }
@@ -797,6 +800,21 @@ export default function FamilyMembersPage() {
                     }
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     placeholder="1950"
+                  />
+                </div>
+
+                {/* Birthdate */}
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 ml-1">
+                    জন্ম তারিখ (Birthdate)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.birthdate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, birthdate: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
                 </div>
 
@@ -1097,6 +1115,14 @@ export default function FamilyMembersPage() {
                     {viewingMember.birthYear || "অজানা"}
                   </p>
                 </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    জন্ম তারিখ
+                  </p>
+                  <p className="text-sm font-bold text-slate-700">
+                    {viewingMember.birthdate || "অজানা"}
+                  </p>
+                </div>
                 {!viewingMember.alive && (
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -1140,7 +1166,7 @@ export default function FamilyMembersPage() {
                         </span>
                         <span className="text-sm font-bold text-slate-700">
                           {members.find(
-                            (m) => m.uniqueId === viewingMember.fatherId
+                            (m) => m.uniqueId === viewingMember.fatherId,
                           )?.name || (
                             <span className="text-slate-300 italic">অজানা</span>
                           )}
@@ -1152,7 +1178,7 @@ export default function FamilyMembersPage() {
                         </span>
                         <span className="text-sm font-bold text-slate-700">
                           {members.find(
-                            (m) => m.uniqueId === viewingMember.motherId
+                            (m) => m.uniqueId === viewingMember.motherId,
                           )?.name || (
                             <span className="text-slate-300 italic">অজানা</span>
                           )}
@@ -1170,7 +1196,7 @@ export default function FamilyMembersPage() {
                       {viewingMember.spouseIds?.length > 0 ? (
                         viewingMember.spouseIds.map((sid) => {
                           const spouse = members.find(
-                            (m) => m.uniqueId === sid
+                            (m) => m.uniqueId === sid,
                           );
                           return (
                             <div

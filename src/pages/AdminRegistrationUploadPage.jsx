@@ -78,7 +78,7 @@ export default function AdminRegistrationUploadPage() {
           const group = groups.find(
             (g) =>
               g.name?.toLowerCase() === groupName?.toLowerCase() ||
-              g.description?.toLowerCase() === groupName?.toLowerCase()
+              g.description?.toLowerCase() === groupName?.toLowerCase(),
           );
           if (group) {
             groupedData[mobile].group_id = group.id;
@@ -90,6 +90,8 @@ export default function AdminRegistrationUploadPage() {
           gender: row["Gender"] || "Male",
           age: row["Age"] || "",
           t_shirt_size: row["T-Shirt Size"] || "L",
+          birthYear: row["Birth Year"] || "",
+          birthdate: row["Birthdate"] || "",
         });
       });
 
@@ -99,7 +101,7 @@ export default function AdminRegistrationUploadPage() {
       for (const reg of finalRegistrations) {
         if (!reg.group_id) {
           console.warn(
-            `Skipping registration for ${reg.mobile}: Group not found.`
+            `Skipping registration for ${reg.mobile}: Group not found.`,
           );
           continue;
         }
@@ -124,7 +126,7 @@ export default function AdminRegistrationUploadPage() {
         setPreviewData([]);
       } else {
         toast.error(
-          "পর্যাপ্ত বা সঠিক ডেটা পাওয়া যায়নি। গ্রুপ নামগুলো ঠিক আছে কিনা নিশ্চিত করুন।"
+          "পর্যাপ্ত বা সঠিক ডেটা পাওয়া যায়নি। গ্রুপ নামগুলো ঠিক আছে কিনা নিশ্চিত করুন।",
         );
       }
     } catch (error) {
@@ -148,6 +150,8 @@ export default function AdminRegistrationUploadPage() {
         Gender: "Male",
         Age: 32,
         "T-Shirt Size": "L",
+        "Birth Year": 1994,
+        Birthdate: "1994-05-15",
       },
       {
         Mobile: "01711223344",
@@ -160,6 +164,8 @@ export default function AdminRegistrationUploadPage() {
         Gender: "Female",
         Age: 28,
         "T-Shirt Size": "M",
+        "Birth Year": 1998,
+        Birthdate: "1998-10-20",
       },
     ];
 
@@ -189,7 +195,7 @@ export default function AdminRegistrationUploadPage() {
           </button>
           <p className="text-[10px] text-gray-400 max-w-xs leading-relaxed text-right">
             Mobile, Head Name, Email, Group, Amount, Status, Participant Name,
-            Gender, Age, T-Shirt Size
+            Gender, Age, T-Shirt Size, Birth Year, Birthdate
           </p>
         </div>
       </div>
