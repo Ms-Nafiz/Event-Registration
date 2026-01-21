@@ -1,0 +1,1 @@
+import{r}from"./@firebase/app-BjC-wD6T.js";import"./@firebase/auth-LjKT5wM5.js";import"./@firebase/logger-BTL5tgLx.js";import"./@firebase/firestore-B8HNlpN_.js";var i="firebase",e="12.5.0";r(i,e,"app");

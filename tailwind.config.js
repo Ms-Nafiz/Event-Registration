@@ -1,16 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       fontFamily: {
-        kalpurush: ['Kalpurush', 'sans-serif'],
-        NotoSansBengali: ['Noto Sans Bengali', 'sans-serif'],
+        kalpurush: ["Kalpurush", "sans-serif"],
+        NotoSansBengali: ["Noto Sans Bengali", "sans-serif"],
+        bengali: ["Hind Siliguri", "sans-serif"],
+        bangla: ["Hind Siliguri", "sans-serif"],
       },
     },
   },
   plugins: [],
-}
+};

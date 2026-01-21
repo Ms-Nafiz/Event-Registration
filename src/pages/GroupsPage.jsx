@@ -9,6 +9,7 @@ import {
   doc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
+import ConfirmModal from "../components/common/ConfirmModal";
 import Modal from "../components/common/Modal";
 
 export default function GroupsPage() {
@@ -22,6 +23,13 @@ export default function GroupsPage() {
     name: "",
     description: "",
     teamLeaders: [],
+  });
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    type: "primary",
   });
   const [userSearch, setUserSearch] = useState(""); // Search for users in modal
 
@@ -110,24 +118,31 @@ export default function GroupsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("আপনি কি এই গ্রুপটি ডিলিট করতে নিশ্চিত?")) {
-      try {
-        const groupDoc = doc(db, "groups", id);
-        await deleteDoc(groupDoc);
-        toast.success("গ্রুপ ডিলিট করা হয়েছে।");
-        fetchData();
-      } catch {
-        toast.error("ডিলিট করা যায়নি।");
-      }
-    }
+  const handleDelete = (id) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "ডিলিট নিশ্চিত করুন",
+      message:
+        "আপনি কি এই গ্রুপটি ডিলিট করতে নিশ্চিত? এই কাজটি আর ফেরত নেওয়া যাবে না।",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          const groupDoc = doc(db, "groups", id);
+          await deleteDoc(groupDoc);
+          toast.success("গ্রুপ ডিলিট করা হয়েছে।");
+          fetchData();
+        } catch {
+          toast.error("ডিলিট করা যায়নি।");
+        }
+      },
+    });
   };
 
   // Filter users for selection
   const filteredUsers = users.filter(
     (u) =>
       u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.mobile?.includes(userSearch)
+      u.mobile?.includes(userSearch),
   );
 
   return (
@@ -313,7 +328,7 @@ export default function GroupsPage() {
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => {
                     const isSelected = formData.teamLeaders.some(
-                      (l) => l.id === user.id
+                      (l) => l.id === user.id,
                     );
                     return (
                       <div
@@ -411,6 +426,11 @@ export default function GroupsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        config={confirmConfig}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+      />
     </div>
   );
 }

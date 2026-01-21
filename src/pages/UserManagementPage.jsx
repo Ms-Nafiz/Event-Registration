@@ -8,63 +8,64 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
+import ConfirmModal from "../components/common/ConfirmModal";
+import { useData } from "../contexts/DataContext";
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchUsers = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      const userList = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setUsers(userList);
-    } catch {
-      toast.error("ইউজার লোড করা যায়নি।");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const { users, loading: dataLoading } = useData();
+  const loading = dataLoading.users;
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    type: "primary",
+  });
 
   const handleApprove = async (userId) => {
     try {
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, { status: "approved" });
       toast.success("ইউজার অনুমোদিত হয়েছে! ✅");
-      fetchUsers();
     } catch {
       toast.error("আপডেট ব্যর্থ হয়েছে।");
     }
   };
 
-  const handleMakeAdmin = async (userId) => {
-    if (!window.confirm("আপনি কি নিশ্চিত এই ইউজারকে অ্যাডমিন বানাতে চান?"))
-      return;
-    try {
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, { role: "admin", status: "approved" });
-      toast.success("নতুন অ্যাডমিন তৈরি করা হয়েছে! 👑");
-      fetchUsers();
-    } catch {
-      toast.error("ব্যর্থ হয়েছে।");
-    }
+  const handleMakeAdmin = (userId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "অ্যাডমিন নিশ্চিত করুন",
+      message: "আপনি কি নিশ্চিত এই ইউজারকে অ্যাডমিন বানাতে চান?",
+      type: "primary",
+      onConfirm: async () => {
+        try {
+          const userRef = doc(db, "users", userId);
+          await updateDoc(userRef, { role: "admin", status: "approved" });
+          toast.success("নতুন অ্যাডমিন তৈরি করা হয়েছে! 👑");
+        } catch {
+          toast.error("ব্যর্থ হয়েছে।");
+        }
+      },
+    });
   };
 
-  const handleDelete = async (userId) => {
-    if (!window.confirm("সতর্কতা: এই ইউজার ডিলিট হয়ে যাবে!")) return;
-    try {
-      await deleteDoc(doc(db, "users", userId));
-      toast.success("ইউজার ডিলিট হয়েছে।");
-      fetchUsers();
-    } catch {
-      toast.error("ডিলিট করা যায়নি.");
-    }
+  const handleDelete = (userId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "ডিলিট নিশ্চিত করুন",
+      message:
+        "সতর্কতা: এই ইউজার ডিলিট হয়ে যাবে! এই কাজটি আর ফেরত নেওয়া যাবে না।",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "users", userId));
+          toast.success("ইউজার ডিলিট হয়েছে।");
+        } catch {
+          toast.error("ডিলিট করা যায়নি.");
+        }
+      },
+    });
   };
 
   return (
@@ -265,6 +266,11 @@ export default function UserManagementPage() {
           </>
         )}
       </div>
+
+      <ConfirmModal
+        config={confirmConfig}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+      />
     </div>
   );
 }

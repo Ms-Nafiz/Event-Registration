@@ -18,81 +18,118 @@ const SidebarContent = ({
     navigate("/admin/login");
   };
 
-  const allNavItems = [
+  const navGroups = [
     {
-      name: "ড্যাশবোর্ড",
-      path: "/admin/dashboard",
-      icon: "🏠",
-      roles: ["admin", "user"],
+      groupName: "মূল মেনু",
+      items: [
+        {
+          name: "ড্যাশবোর্ড",
+          path: "/admin/dashboard",
+          icon: "🏠",
+          roles: ["admin", "user"],
+        },
+        {
+          name: "প্রোফাইল",
+          path: "/admin/profile",
+          icon: "👤",
+          roles: ["admin", "user"],
+        },
+      ],
     },
     {
-      name: "প্রোফাইল",
-      path: "/admin/profile",
-      icon: "👤",
-      roles: ["admin", "user"],
-    },
-
-    // Admin Only
-    { name: "স্ক্যানার", path: "/admin/scan", icon: "📷", roles: ["admin"] },
-    {
-      name: "নতুন এন্ট্রি",
-      path: "/admin/create-entry",
-      icon: "📝",
-      roles: ["admin"],
-    },
-    { name: "রেজিস্ট্রেশন", path: "/admin/list", icon: "👥", roles: ["admin"] },
-    { name: "গ্রুপ", path: "/admin/groups", icon: "📦", roles: ["admin"] },
-    { name: "ব্যবহারকারী", path: "/admin/users", icon: "⚙️", roles: ["admin"] },
-    {
-      name: "বংশ সদস্য",
-      path: "/admin/members",
-      icon: "🌳",
-      roles: ["admin", "user"],
-    },
-    {
-      name: "সদস্য আপলোড",
-      path: "/admin/bulk-members-upload",
-      icon: "📤",
-      roles: ["admin"],
-    },
-
-    // Donation
-    {
-      name: "বাল্ক আপলোড",
-      path: "/admin/bulk-donate",
-      icon: "📤",
-      roles: ["admin"],
+      groupName: "রেজিস্ট্রেশন ও এন্ট্রি",
+      items: [
+        {
+          name: "রেজিস্ট্রেশন তালিকা",
+          path: "/admin/list",
+          icon: "👥",
+          roles: ["admin"],
+        },
+        {
+          name: "নতুন এন্ট্রি",
+          path: "/admin/create-entry",
+          icon: "📝",
+          roles: ["admin"],
+        },
+        {
+          name: "কিউআর স্ক্যানার",
+          path: "/admin/scan",
+          icon: "📷",
+          roles: ["admin"],
+        },
+        {
+          name: "গ্রুপ ম্যানেজমেন্ট",
+          path: "/admin/groups",
+          icon: "📦",
+          roles: ["admin"],
+        },
+      ],
     },
     {
-      name: "ডোনেশন লিস্ট",
-      path: "/admin/donation-list",
-      icon: "💰",
-      roles: ["admin"],
+      groupName: "বংশ ও সদস্য",
+      items: [
+        {
+          name: "বংশ সদস্য",
+          path: "/admin/members",
+          icon: "🌳",
+          roles: ["admin", "user"],
+        },
+        {
+          name: "সদস্য আপলোড",
+          path: "/admin/bulk-members-upload",
+          icon: "📤",
+          roles: ["admin"],
+        },
+      ],
     },
     {
-      name: "চাঁদা সারাংশ",
-      path: "/admin/contribution-summary",
-      icon: "📊",
-      roles: ["admin"],
+      groupName: "ডোনেশন ম্যানেজমেন্ট",
+      items: [
+        {
+          name: "ডোনেশন দিন",
+          path: "/admin/donate",
+          icon: "💸",
+          roles: ["admin", "user"],
+        },
+        {
+          name: "ডোনেশন লিস্ট",
+          path: "/admin/donation-list",
+          icon: "💰",
+          roles: ["admin"],
+        },
+        {
+          name: "বাল্ক আপলোড",
+          path: "/admin/bulk-donate",
+          icon: "📤",
+          roles: ["admin"],
+        },
+        {
+          name: "চাঁদা সারাংশ",
+          path: "/admin/contribution-summary",
+          icon: "📊",
+          roles: ["admin"],
+        },
+      ],
     },
     {
-      name: "ডোনেশন দিন",
-      path: "/admin/donate",
-      icon: "💸",
-      roles: ["admin", "user"],
+      groupName: "সিস্টেম",
+      items: [
+        {
+          name: "ব্যবহারকারী",
+          path: "/admin/users",
+          icon: "⚙️",
+          roles: ["admin"],
+        },
+      ],
     },
   ];
-
-  const allowedNavItems = allNavItems.filter((item) =>
-    item.roles.includes(userRole)
-  );
 
   return (
     <div
       className={`
       flex flex-col h-full transition-all duration-300 ease-in-out
       bg-slate-900 text-white shadow-xl
-      ${collapsed ? "w-20" : "w-72"}
+      ${collapsed ? "w-20" : "w-64"}
     `}
     >
       {/* Header */}
@@ -156,50 +193,70 @@ const SidebarContent = ({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
-        {allowedNavItems.map((item) => {
-          const isActive = location.pathname === item.path;
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 custom-scrollbar">
+        {navGroups.map((group, groupIdx) => {
+          const allowedItems = group.items.filter((item) =>
+            item.roles.includes(userRole),
+          );
+          if (allowedItems.length === 0) return null;
+
           return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={() => isMobile && setMobileOpen(false)}
-              className={`
-                flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden
-                ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
-                    : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                }
-                ${collapsed ? "justify-center" : ""}
-              `}
-            >
-              {isActive && (
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 opacity-100 z-0"></div>
-              )}
-
-              <span
-                className={`relative z-10 text-xl transition-transform duration-300 ${
-                  isActive ? "scale-110" : "group-hover:scale-110"
-                }`}
-              >
-                {item.icon}
-              </span>
-
+            <div key={groupIdx} className="space-y-1">
               {!collapsed && (
-                <span
-                  className={`relative z-10 ml-3 font-medium font-bangla text-sm whitespace-nowrap transition-all duration-300`}
-                >
-                  {item.name}
-                </span>
-              )}
-
-              {collapsed && (
-                <div className="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-xl border border-slate-700">
-                  {item.name}
+                <div className="flex items-center gap-2 px-4 mb-2 mt-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></span>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex-1">
+                    {group.groupName}
+                  </p>
+                  <div className="h-[1px] flex-1 bg-gradient-to-r from-slate-700/50 to-transparent"></div>
                 </div>
               )}
-            </Link>
+              {allowedItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                    className={`
+                      flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden
+                      ${
+                        isActive
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
+                          : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                      }
+                      ${collapsed ? "justify-center" : ""}
+                    `}
+                  >
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 opacity-100 z-0"></div>
+                    )}
+
+                    <span
+                      className={`relative z-10 text-xl transition-transform duration-300 ${
+                        isActive ? "scale-110" : "group-hover:scale-110"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+
+                    {!collapsed && (
+                      <span
+                        className={`relative z-10 ml-3 font-medium font-bangla text-sm whitespace-nowrap transition-all duration-300`}
+                      >
+                        {item.name}
+                      </span>
+                    )}
+
+                    {collapsed && (
+                      <div className="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-xl border border-slate-700">
+                        {item.name}
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
@@ -273,7 +330,7 @@ export default function Sidebar({
         ></div>
 
         <div
-          className={`absolute top-0 left-0 bottom-0 w-72 bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out ${
+          className={`absolute top-0 left-0 bottom-0 w-64 bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-out ${
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >

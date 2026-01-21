@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase";
+import { useData } from "../contexts/DataContext";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -129,7 +130,7 @@ function GroupCard({ group, idx }) {
                         {count}
                       </p>
                     </div>
-                  )
+                  ),
               )}
             </div>
           </div>
@@ -140,123 +141,123 @@ function GroupCard({ group, idx }) {
 }
 
 export default function HomePage() {
-  const [stats, setStats] = useState(null);
+  const { registrations, groups, loading: dataLoading } = useData();
+  const [stats, setStats] = useState({
+    total_registrations: 0,
+    total_members: 0,
+    total_paid: 0,
+    total_pending: 0,
+  });
   const [recentRegistrations, setRecentRegistrations] = useState([]);
   const [groupStats, setGroupStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalViews, setTotalViews] = useState(0);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchViews = async () => {
       try {
-        setLoading(true);
-
-        const groupsSnapshot = await getDocs(collection(db, "groups"));
-        const groupsMap = {};
-        groupsSnapshot.forEach((doc) => {
-          groupsMap[doc.id] = doc.data().name;
-        });
-
-        const regSnapshot = await getDocs(collection(db, "registrations"));
-        const registrations = regSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        let totalReg = 0;
-        let totalMem = 0;
-        let paid = 0;
-        let pending = 0;
-        const groupCounts = {};
-
-        registrations.forEach((reg) => {
-          totalReg++;
-          const memCount = parseInt(reg.totalMembers) || 0;
-          totalMem += memCount;
-
-          if (reg.paymentStatus === "Paid") paid++;
-          else if (reg.paymentStatus === "Pending") pending++;
-
-          const gid = reg.group_id;
-          if (gid) {
-            if (!groupCounts[gid]) {
-              groupCounts[gid] = {
-                regCount: 0,
-                memCount: 0,
-                demographics: { male: 0, female: 0, children: 0 },
-                tshirtSizes: { S: 0, M: 0, L: 0, XL: 0, XXL: 0, NA: 0 },
-              };
-            }
-            groupCounts[gid].regCount++;
-            groupCounts[gid].memCount += memCount;
-
-            // Process members array for demographics and t-shirt sizes
-            if (reg.members && Array.isArray(reg.members)) {
-              reg.members.forEach((member) => {
-                // Count by gender
-                if (member.gender === "Male") {
-                  groupCounts[gid].demographics.male++;
-                } else if (member.gender === "Female") {
-                  groupCounts[gid].demographics.female++;
-                } else if (member.gender === "Child") {
-                  groupCounts[gid].demographics.children++;
-                }
-
-                // Count by t-shirt size
-                const size = member.t_shirt_size || "NA";
-                if (groupCounts[gid].tshirtSizes[size] !== undefined) {
-                  groupCounts[gid].tshirtSizes[size]++;
-                }
-              });
-            }
-          }
-        });
-
-        const formattedGroupStats = Object.keys(groupCounts).map((gid) => ({
-          id: gid,
-          name: groupsMap[gid] || "অজানা গ্রুপ",
-          registrations_count: groupCounts[gid].regCount,
-          total_members: groupCounts[gid].memCount,
-          demographics: groupCounts[gid].demographics,
-          tshirtSizes: groupCounts[gid].tshirtSizes,
-        }));
-
-        const sortedRecent = [...registrations]
-          .sort((a, b) => {
-            const dateA = a.createdAt?.seconds ? a.createdAt.seconds : 0;
-            const dateB = b.createdAt?.seconds ? b.createdAt.seconds : 0;
-            return dateB - dateA;
-          })
-          .slice(0, 5);
-
-        const recentWithNames = sortedRecent.map((reg) => ({
-          ...reg,
-          groupName: groupsMap[reg.group_id] || "N/A",
-        }));
-
-        setStats({
-          total_registrations: totalReg,
-          total_members: totalMem,
-          total_paid: paid,
-          total_pending: pending,
-        });
-        setGroupStats(formattedGroupStats);
-        setRecentRegistrations(recentWithNames);
         const statsRef = doc(db, "stats", "page_views");
         const statsSnap = await getDoc(statsRef);
         if (statsSnap.exists()) {
           setTotalViews(statsSnap.data().count);
         }
       } catch (error) {
-        console.error(error);
-        toast.error("ড্যাশবোর্ড ডেটা লোড করা যায়নি।");
-      } finally {
-        setLoading(false);
+        console.error("Error fetching views:", error);
       }
     };
-
-    fetchDashboardData();
+    fetchViews();
   }, []);
+
+  useEffect(() => {
+    if (!dataLoading.registrations && !dataLoading.groups) {
+      processDashboardData(registrations, groups);
+      setLoading(false);
+    }
+  }, [registrations, groups, dataLoading]);
+
+  const processDashboardData = (allRegistrations, allGroups) => {
+    const groupsMap = {};
+    allGroups.forEach((g) => {
+      groupsMap[g.id] = g.name;
+    });
+
+    let totalReg = 0;
+    let totalMem = 0;
+    let paid = 0;
+    let pending = 0;
+    const groupCounts = {};
+
+    allRegistrations.forEach((reg) => {
+      totalReg++;
+      const memCount = parseInt(reg.totalMembers) || 0;
+      totalMem += memCount;
+
+      if (reg.paymentStatus === "Paid") paid++;
+      else if (reg.paymentStatus === "Pending") pending++;
+
+      const gid = reg.group_id;
+      if (gid) {
+        if (!groupCounts[gid]) {
+          groupCounts[gid] = {
+            regCount: 0,
+            memCount: 0,
+            demographics: { male: 0, female: 0, children: 0 },
+            tshirtSizes: { S: 0, M: 0, L: 0, XL: 0, XXL: 0, NA: 0 },
+          };
+        }
+        groupCounts[gid].regCount++;
+        groupCounts[gid].memCount += memCount;
+
+        if (reg.members && Array.isArray(reg.members)) {
+          reg.members.forEach((member) => {
+            if (member.gender === "Male") {
+              groupCounts[gid].demographics.male++;
+            } else if (member.gender === "Female") {
+              groupCounts[gid].demographics.female++;
+            } else if (member.gender === "Child") {
+              groupCounts[gid].demographics.children++;
+            }
+
+            const size = member.t_shirt_size || "NA";
+            if (groupCounts[gid].tshirtSizes[size] !== undefined) {
+              groupCounts[gid].tshirtSizes[size]++;
+            }
+          });
+        }
+      }
+    });
+
+    const formattedGroupStats = Object.keys(groupCounts).map((gid) => ({
+      id: gid,
+      name: groupsMap[gid] || "অজানা গ্রুপ",
+      registrations_count: groupCounts[gid].regCount,
+      total_members: groupCounts[gid].memCount,
+      demographics: groupCounts[gid].demographics,
+      tshirtSizes: groupCounts[gid].tshirtSizes,
+    }));
+
+    const sortedRecent = [...allRegistrations]
+      .sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds : 0;
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds : 0;
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+
+    const recentWithNames = sortedRecent.map((reg) => ({
+      ...reg,
+      groupName: groupsMap[reg.group_id] || "N/A",
+    }));
+
+    setStats({
+      total_registrations: totalReg,
+      total_members: totalMem,
+      total_paid: paid,
+      total_pending: pending,
+    });
+    setGroupStats(formattedGroupStats);
+    setRecentRegistrations(recentWithNames);
+  };
 
   if (loading) {
     return (
@@ -492,7 +493,7 @@ export default function HomePage() {
                               {count}
                             </p>
                           </div>
-                        ) : null
+                        ) : null,
                       )}
                     </div>
                   </div>

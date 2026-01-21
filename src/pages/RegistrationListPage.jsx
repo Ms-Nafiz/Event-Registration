@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import ConfirmModal from "../components/common/ConfirmModal";
+import { useData } from "../contexts/DataContext";
 import { db } from "../firebase";
 import {
   collection,
@@ -19,6 +21,25 @@ import React from "react";
 // Deferred PDF component to prevent re-renders on every page action
 const DeferredPDFDownload = React.memo(({ reg }) => {
   const [ready, setReady] = React.useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = React.useState("");
+  const [genLoading, setGenLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (ready && !qrCodeUrl) {
+      const genQR = async () => {
+        setGenLoading(true);
+        try {
+          const url = await QRCode.toDataURL(reg.registrationId || reg.id);
+          setQrCodeUrl(url);
+        } catch (err) {
+          console.error("QR Error", err);
+        } finally {
+          setGenLoading(false);
+        }
+      };
+      genQR();
+    }
+  }, [ready, qrCodeUrl, reg]);
 
   if (!ready) {
     return (
@@ -27,6 +48,14 @@ const DeferredPDFDownload = React.memo(({ reg }) => {
         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
       >
         <span>⬇</span> PDF
+      </button>
+    );
+  }
+
+  if (genLoading || (ready && !qrCodeUrl)) {
+    return (
+      <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 text-gray-400">
+        ...
       </button>
     );
   }
@@ -40,7 +69,7 @@ const DeferredPDFDownload = React.memo(({ reg }) => {
             groupName: reg.finalGroupName,
             totalMembers: reg.finalTotalMembers,
           }}
-          qrCodeUrl={reg.qrCodeUrl}
+          qrCodeUrl={qrCodeUrl}
         />
       }
       fileName={`card-${reg.registrationId || reg.id}.pdf`}
@@ -66,6 +95,25 @@ const DeferredPDFDownload = React.memo(({ reg }) => {
 // Mobile version of the same optimization
 const DeferredPDFDownloadMobile = React.memo(({ reg }) => {
   const [ready, setReady] = React.useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = React.useState("");
+  const [genLoading, setGenLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (ready && !qrCodeUrl) {
+      const genQR = async () => {
+        setGenLoading(true);
+        try {
+          const url = await QRCode.toDataURL(reg.registrationId || reg.id);
+          setQrCodeUrl(url);
+        } catch (err) {
+          console.error("QR Error", err);
+        } finally {
+          setGenLoading(false);
+        }
+      };
+      genQR();
+    }
+  }, [ready, qrCodeUrl, reg]);
 
   if (!ready) {
     return (
@@ -87,14 +135,14 @@ const DeferredPDFDownloadMobile = React.memo(({ reg }) => {
             groupName: reg.finalGroupName,
             totalMembers: reg.finalTotalMembers,
           }}
-          qrCodeUrl={reg.qrCodeUrl}
+          qrCodeUrl={qrCodeUrl}
         />
       }
       fileName={`card-${reg.registrationId || reg.id}.pdf`}
     >
       {({ loading }) => (
         <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm active:scale-95 transition-transform">
-          {loading ? "প্রসেসিং..." : "✅ ডাউনলোড শুরু করুন"}
+          {loading || genLoading ? "প্রসেসিং..." : "✅ ডাউনলোড শুরু করুন"}
         </button>
       )}
     </PDFDownloadLink>
@@ -139,63 +187,46 @@ export default function RegistrationListPage() {
   });
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [expandedRow, setExpandedRow] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    type: "primary",
+  });
+
+  const {
+    registrations: rawRegistrations,
+    groups: allGroups,
+    loading: dataLoading,
+  } = useData();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const groupsSnapshot = await getDocs(collection(db, "groups"));
-        const groupsList = groupsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setGroups(groupsList);
+    if (!dataLoading.registrations && !dataLoading.groups) {
+      const groupsMap = {};
+      allGroups.forEach((group) => {
+        groupsMap[group.id] = group.name;
+      });
+      setGroups(allGroups);
 
-        const groupsMap = {};
-        groupsList.forEach((group) => {
-          groupsMap[group.id] = group.name;
-        });
+      const enriched = rawRegistrations.map((reg) => {
+        const groupNameResolve =
+          reg.groupName || groupsMap[reg.group_id] || "N/A";
+        const totalMemResolve = reg.totalMembers || reg.total_members || 0;
 
-        const q = query(
-          collection(db, "registrations"),
-          orderBy("createdAt", "desc"),
-        );
-        const querySnapshot = await getDocs(q);
+        return {
+          ...reg,
+          firebaseDocId: reg.firebaseDocId,
+          registrationId: reg.id || reg.registrationId, // Use custom ID if present, otherwise firebase ID
+          finalGroupName: groupNameResolve,
+          finalTotalMembers: totalMemResolve,
+        };
+      });
 
-        const data = querySnapshot.docs.map((doc) => {
-          const docData = doc.data();
-          const groupNameResolve =
-            docData.groupName || groupsMap[docData.group_id] || "N/A";
-          const totalMemResolve =
-            docData.totalMembers || docData.total_members || 0;
-
-          return {
-            ...docData, // ✅ প্রথমে docData spread করা
-            firebaseDocId: doc.id, // ✅ Firebase doc ID আলাদা field এ
-            registrationId: docData.id, // ✅ Custom HF-xxxxx ID
-            finalGroupName: groupNameResolve,
-            finalTotalMembers: totalMemResolve,
-          };
-        });
-
-        const dataWithQR = await Promise.all(
-          data.map(async (item) => {
-            // ✅ Custom HF-xxxxx ID দিয়ে QR code তৈরি
-            const qrUrl = await QRCode.toDataURL(
-              item.registrationId || item.id,
-            );
-            return { ...item, qrCodeUrl: qrUrl };
-          }),
-        );
-
-        setRegistrations(dataWithQR);
-      } catch {
-        toast.error("ডেটা লোড করা যায়নি");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+      setRegistrations(enriched);
+      setLoading(false);
+    }
+  }, [rawRegistrations, allGroups, dataLoading]);
 
   // Open edit modal
   const openEditModal = (reg, memberIndex) => {
@@ -227,20 +258,6 @@ export default function RegistrationListPage() {
 
       const regRef = doc(db, "registrations", selectedReg.firebaseDocId);
       await updateDoc(regRef, updateData);
-
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? {
-                ...r,
-                members: updatedMembers,
-                ...(selectedMemberIndex === 0 && {
-                  name: editFormData.member_name,
-                }),
-              }
-            : r,
-        ),
-      );
 
       toast.success("সদস্য সফলভাবে আপডেট করা হয়েছে!");
       setShowEditModal(false);
@@ -281,19 +298,6 @@ export default function RegistrationListPage() {
         members: updatedMembers,
         totalMembers: newTotalMembers,
       });
-
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? {
-                ...r,
-                members: updatedMembers,
-                totalMembers: newTotalMembers,
-                finalTotalMembers: newTotalMembers,
-              }
-            : r,
-        ),
-      );
 
       toast.success("নতুন সদস্য যুক্ত করা হয়েছে!");
       setShowAddMemberModal(false);
@@ -340,17 +344,6 @@ export default function RegistrationListPage() {
 
       await updateDoc(regRef, updateData);
 
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? {
-                ...r,
-                ...updateData,
-              }
-            : r,
-        ),
-      );
-
       toast.success("রেজিস্ট্রেশন তথ্য সফলভাবে আপডেট করা হয়েছে!");
       setShowEditRegModal(false);
     } catch (error) {
@@ -379,15 +372,6 @@ export default function RegistrationListPage() {
       await updateDoc(regRef, {
         paymentStatus: newStatus,
       });
-
-      // Update local state
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? { ...r, paymentStatus: newStatus }
-            : r,
-        ),
-      );
 
       toast.success(
         newStatus === "Paid"
@@ -418,22 +402,6 @@ export default function RegistrationListPage() {
         group_id: selectedGroupId,
       });
 
-      const updatedGroupName =
-        groups.find((g) => g.id === selectedGroupId)?.name || "N/A";
-
-      // Update local state
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? {
-                ...r,
-                group_id: selectedGroupId,
-                finalGroupName: updatedGroupName,
-              }
-            : r,
-        ),
-      );
-
       toast.success("গ্রুপ সফলভাবে আপডেট করা হয়েছে!");
       setShowGroupModal(false);
     } catch (error) {
@@ -443,46 +411,35 @@ export default function RegistrationListPage() {
   };
 
   // Handle Toggle Check-in
-  const handleToggleCheckIn = async (reg) => {
-    const isConfirm = window.confirm(
-      reg.checkedIn
+  const handleToggleCheckIn = (reg) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: reg.checkedIn ? "চেক-ইন বাতিল" : "চেক-ইন নিশ্চিত",
+      message: reg.checkedIn
         ? `আপনি কি ${reg.name}-এর চেক-ইন বাতিল করতে চান?`
         : `আপনি কি ${reg.name}-কে চেক-ইন করাতে চান?`,
-    );
+      type: reg.checkedIn ? "warning" : "success",
+      onConfirm: async () => {
+        try {
+          const newStatus = !reg.checkedIn;
+          const regRef = doc(db, "registrations", reg.firebaseDocId);
 
-    if (!isConfirm) return;
+          await updateDoc(regRef, {
+            checkedIn: newStatus,
+            checkInTime: newStatus ? new Date() : null,
+          });
 
-    try {
-      const newStatus = !reg.checkedIn;
-      const regRef = doc(db, "registrations", reg.firebaseDocId);
-
-      await updateDoc(regRef, {
-        checkedIn: newStatus,
-        checkInTime: newStatus ? new Date() : null,
-      });
-
-      // Update local state
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === reg.firebaseDocId
-            ? {
-                ...r,
-                checkedIn: newStatus,
-                checkInTime: newStatus ? new Date() : null,
-              }
-            : r,
-        ),
-      );
-
-      toast.success(
-        newStatus
-          ? `${reg.name} সফলভাবে চেক-ইন করা হয়েছে!`
-          : `${reg.name} চেক-ইন বাতিল করা হয়েছে!`,
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error("চেক-ইন স্ট্যাটাস আপডেট ব্যর্থ হয়েছে।");
-    }
+          toast.success(
+            newStatus
+              ? `${reg.name} সফলভাবে চেক-ইন করা হয়েছে!`
+              : `${reg.name} চেক-ইন বাতিল করা হয়েছে!`,
+          );
+        } catch (error) {
+          console.error(error);
+          toast.error("চেক-ইন স্ট্যাটাস আপডেট ব্যর্থ হয়েছে।");
+        }
+      },
+    });
   };
 
   // Handle delete member
@@ -492,13 +449,6 @@ export default function RegistrationListPage() {
       if (selectedMemberIndex === 0) {
         const regRef = doc(db, "registrations", selectedReg.firebaseDocId);
         await deleteDoc(regRef);
-
-        // Remove from local state
-        setRegistrations(
-          registrations.filter(
-            (r) => r.firebaseDocId !== selectedReg.firebaseDocId,
-          ),
-        );
 
         toast.success("মূল সদস্য এবং সকল তথ্য মুছে ফেলা হয়েছে!");
         setShowDeleteModal(false);
@@ -516,20 +466,6 @@ export default function RegistrationListPage() {
         members: updatedMembers,
         totalMembers: newTotalMembers,
       });
-
-      // Update local state
-      setRegistrations(
-        registrations.map((r) =>
-          r.firebaseDocId === selectedReg.firebaseDocId
-            ? {
-                ...r,
-                members: updatedMembers,
-                totalMembers: newTotalMembers,
-                finalTotalMembers: newTotalMembers,
-              }
-            : r,
-        ),
-      );
 
       toast.success("সদস্য সফলভাবে মুছে ফেলা হয়েছে!");
       setShowDeleteModal(false);
@@ -1451,6 +1387,11 @@ export default function RegistrationListPage() {
           </div>
         </div>
       )}
+      {/* Custom Confirmation Modal */}
+      <ConfirmModal
+        config={confirmConfig}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+      />
     </div>
   );
 }
