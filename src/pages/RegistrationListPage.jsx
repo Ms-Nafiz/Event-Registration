@@ -487,7 +487,7 @@ export default function RegistrationListPage() {
   const filteredRegistrations = registrations.filter(
     (reg) =>
       reg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reg.mobile.includes(searchTerm) ||
+      reg.mobile?.toString().includes(searchTerm) ||
       (reg.finalGroupName &&
         reg.finalGroupName.toLowerCase().includes(searchTerm.toLowerCase())),
   );

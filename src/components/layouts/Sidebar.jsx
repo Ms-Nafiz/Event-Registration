@@ -80,6 +80,12 @@ const SidebarContent = ({
           icon: "📤",
           roles: ["admin"],
         },
+        {
+          name: "বংশ সারাংশ",
+          path: "/admin/family-summary",
+          icon: "📊",
+          roles: ["admin", "user"],
+        },
       ],
     },
     {
@@ -107,6 +113,12 @@ const SidebarContent = ({
           name: "চাঁদা সারাংশ",
           path: "/admin/contribution-summary",
           icon: "📊",
+          roles: ["admin"],
+        },
+        {
+          name: "ডোনেশন রিপোর্ট",
+          path: "/admin/donation-report",
+          icon: "📜",
           roles: ["admin"],
         },
       ],

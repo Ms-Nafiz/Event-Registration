@@ -68,6 +68,10 @@ export default function FamilyMembersPage() {
   const [viewingMember, setViewingMember] = useState(null);
   const [memberToDelete, setMemberToDelete] = useState(null);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   // Form State
   const initialFormData = {
     name: "",
@@ -127,6 +131,11 @@ export default function FamilyMembersPage() {
       unsubscribeGroups();
     };
   }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, generationFilter, groupFilter]);
 
   const handleAddMember = async (e) => {
     e.preventDefault();
@@ -234,8 +243,11 @@ export default function FamilyMembersPage() {
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.uniqueId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.phone?.includes(searchTerm);
+      member.uniqueId
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      member.phone?.toString().includes(searchTerm);
 
     const matchesGeneration =
       generationFilter === "all" ||
@@ -265,6 +277,14 @@ export default function FamilyMembersPage() {
 
     return matchesSearch && matchesGeneration && matchesGroup;
   });
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedMembers = filteredMembers.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
   const generations = [
     ...new Set(members.map((m) => m.generation?.toString())),
@@ -443,7 +463,7 @@ export default function FamilyMembersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
-                {filteredMembers.map((member) => {
+                {paginatedMembers.map((member) => {
                   const father = members.find(
                     (m) => m.uniqueId === member.fatherId,
                   );
@@ -470,7 +490,7 @@ export default function FamilyMembersPage() {
                           <div>
                             <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
                               {member.name}
-                              {!member.alive && (
+                              {(!member.alive || member.deathYear) && (
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded italic">
                                   মৃত
                                 </span>
@@ -529,7 +549,7 @@ export default function FamilyMembersPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-slate-700">
                           {member.birthYear ? member.birthYear : "????"} -{" "}
-                          {member.alive
+                          {member.alive && !member.deathYear
                             ? "বর্তমান"
                             : member.deathYear || "????"}
                         </div>
@@ -584,6 +604,93 @@ export default function FamilyMembersPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredMembers.length > 0 && (
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="text-xs text-slate-500 font-medium">
+                  মোট সদস্য:{" "}
+                  <span className="text-slate-800 font-bold">
+                    {filteredMembers.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-slate-500 font-medium">
+                    প্রতি পাতায়:
+                  </label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="text-xs px-2 py-1 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700 shadow-sm"
+                  >
+                    {[10, 25, 50, 100].map((num) => (
+                      <option key={num} value={num}>
+                        {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                </button>
+
+                <div className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                  <span className="text-sm font-bold text-indigo-600">
+                    {currentPage}
+                  </span>
+                  <span className="text-slate-300 mx-1">/</span>
+                  <span className="text-sm font-bold text-slate-500">
+                    {totalPages || 1}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
           {filteredMembers.length === 0 && (
             <div className="py-20 text-center text-slate-400 italic">
               কোনো সদস্য পাওয়া যায়নি
@@ -697,10 +804,18 @@ export default function FamilyMembersPage() {
                   </label>
                   <Select
                     options={members
-                      .filter((m) => m.gender === "Male")
+                      .filter(
+                        (m) =>
+                          m.gender === "Male" &&
+                          (!formData.groupid ||
+                            m.groupid == formData.groupid ||
+                            m.groupId == formData.groupid),
+                      )
                       .map((m) => ({
                         value: m.uniqueId,
-                        label: `${m.name} (${m.displayId || m.uniqueId})`,
+                        label: `${m.name} (${m.displayId || m.uniqueId}) ${
+                          m.generation ? `- G${m.generation}` : ""
+                        }`,
                       }))}
                     value={
                       formData.fatherId
@@ -737,10 +852,18 @@ export default function FamilyMembersPage() {
                   </label>
                   <Select
                     options={members
-                      .filter((m) => m.gender === "Female")
+                      .filter(
+                        (m) =>
+                          m.gender === "Female" &&
+                          (!formData.groupid ||
+                            m.groupid == formData.groupid ||
+                            m.groupId == formData.groupid),
+                      )
                       .map((m) => ({
                         value: m.uniqueId,
-                        label: `${m.name} (${m.displayId || m.uniqueId})`,
+                        label: `${m.name} (${m.displayId || m.uniqueId}) ${
+                          m.generation ? `- G${m.generation}` : ""
+                        }`,
                       }))}
                     value={
                       formData.motherId
@@ -931,10 +1054,18 @@ export default function FamilyMembersPage() {
                   </label>
                   <Select
                     isMulti
-                    options={members.map((m) => ({
-                      value: m.uniqueId,
-                      label: `${m.name} (${m.displayId || m.uniqueId})`,
-                    }))}
+                    options={members
+                      .filter(
+                        (m) =>
+                          m.uniqueId !== editingMember?.uniqueId &&
+                          (!formData.groupid ||
+                            m.groupid == formData.groupid ||
+                            m.groupId == formData.groupid),
+                      )
+                      .map((m) => ({
+                        value: m.uniqueId,
+                        label: `${m.name} (${m.displayId || m.uniqueId})`,
+                      }))}
                     value={formData.spouseIds.map((id) => {
                       const m = members.find((x) => x.uniqueId === id);
                       return {
@@ -960,10 +1091,18 @@ export default function FamilyMembersPage() {
                   </label>
                   <Select
                     isMulti
-                    options={members.map((m) => ({
-                      value: m.uniqueId,
-                      label: `${m.name} (${m.displayId || m.uniqueId})`,
-                    }))}
+                    options={members
+                      .filter(
+                        (m) =>
+                          m.uniqueId !== editingMember?.uniqueId &&
+                          (!formData.groupid ||
+                            m.groupid == formData.groupid ||
+                            m.groupId == formData.groupid),
+                      )
+                      .map((m) => ({
+                        value: m.uniqueId,
+                        label: `${m.name} (${m.displayId || m.uniqueId})`,
+                      }))}
                     value={formData.childrenIds.map((id) => {
                       const m = members.find((x) => x.uniqueId === id);
                       return {

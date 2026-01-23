@@ -20,6 +20,8 @@ import AdminDonationListPage from "./pages/AdminDonationListPage";
 import ContributionSummaryPage from "./pages/ContributionSummaryPage";
 import FamilyMembersPage from "./pages/FamilyMembersPage";
 import AdminFamilyUploadPage from "./pages/AdminFamilyUploadPage";
+import FamilySummaryPage from "./pages/FamilySummaryPage";
+import DonationReportPage from "./pages/DonationReportPage";
 
 // --- পাবলিক পেজ ---
 import PublicEventRegistration from "./pages/RegistrationFormPage";
@@ -192,6 +194,14 @@ function App() {
           }
         />
         <Route
+          path="donation-report"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <DonationReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="members"
           element={
             <ProtectedRoute allowedRoles={["admin", "user"]}>
@@ -204,6 +214,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminFamilyUploadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="family-summary"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "user"]}>
+              <FamilySummaryPage />
             </ProtectedRoute>
           }
         />

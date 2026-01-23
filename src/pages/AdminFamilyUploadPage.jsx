@@ -58,7 +58,7 @@ export default function AdminFamilyUploadPage() {
       let successCount = 0;
 
       for (const row of previewData) {
-        const name = row["Name"] || row["সদস্যের নাম"];
+        const name = (row["Name"] || row["সদস্যের নাম"])?.toString();
         if (!name) continue;
 
         const randomId = Math.floor(100000 + Math.random() * 900000);
@@ -88,7 +88,7 @@ export default function AdminFamilyUploadPage() {
           fatherName: row["Father Name"] || row["পিতার নাম"] || "",
           motherName: row["Mother Name"] || row["মাতার নাম"] || "",
           generation: row["Generation"] || row["জেনারেশন"] || 1,
-          phone: row["Phone"] || row["মোবাইল"] || "",
+          phone: (row["Phone"] || row["মোবাইল"] || "")?.toString(),
           address: row["Address"] || row["ঠিকানা"] || "",
           gender: row["Gender"] || row["লিঙ্গ"] || "Male",
           groupid: "",
