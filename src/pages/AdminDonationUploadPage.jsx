@@ -40,7 +40,6 @@ export default function AdminDonationUploadPage() {
     const data = [
       {
         "Member ID": "M-XXXXXX",
-        Mobile: "017XXXXXXXX",
         Amount: 500,
         Month: "January 2026",
       },
@@ -62,23 +61,18 @@ export default function AdminDonationUploadPage() {
       const donationsRef = collection(db, "donations");
 
       const membersSnapshot = await getDocs(membersRef);
-      const memberMap = {}; // Map by uniqueId and Mobile
+      const memberMap = {};
       membersSnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.uniqueId)
-          memberMap[data.uniqueId] = {
-            id: doc.id,
-            name: data.name,
-            displayId: data.displayId,
-            groupId: data.groupid,
-          };
-        if (data.phone)
-          memberMap[data.phone] = {
-            id: doc.id,
-            name: data.name,
-            displayId: data.displayId,
-            groupId: data.groupid,
-          };
+        const memberInfo = {
+          id: doc.id,
+          name: data.name,
+          displayId: data.displayId,
+          groupId: data.groupid || data.groupId || "N/A",
+        };
+
+        if (data.uniqueId) memberMap[data.uniqueId] = memberInfo;
+        if (data.displayId) memberMap[data.displayId] = memberInfo;
       });
 
       let successCount = 0;
@@ -86,11 +80,10 @@ export default function AdminDonationUploadPage() {
 
       for (const row of previewData) {
         const memberIdInput = row["Member ID"]?.toString();
-        const mobile = row["Mobile"]?.toString();
         const amount = row["Amount"];
 
-        // Match by Member ID first, then Mobile
-        const matchedMember = memberMap[memberIdInput] || memberMap[mobile];
+        // Match by Member ID
+        const matchedMember = memberMap[memberIdInput];
 
         if (matchedMember && amount) {
           const newDocRef = doc(donationsRef);
@@ -99,7 +92,7 @@ export default function AdminDonationUploadPage() {
             memberId: matchedMember.id,
             memberDisplayId: matchedMember.displayId,
             userName: matchedMember.name,
-            groupId: matchedMember.groupId || "N/A",
+            groupId: matchedMember.groupId,
             amount: Number(amount),
             date: Timestamp.now(),
             month:
@@ -114,6 +107,7 @@ export default function AdminDonationUploadPage() {
           });
           successCount++;
         } else {
+          console.warn("Failed to match member for row:", row);
           failCount++;
         }
       }

@@ -87,6 +87,29 @@ const safeBangla = (text = "") =>
     .replace(":", ":\u00A0") // non-breaking space
     .normalize("NFC");
 
+const parseMonth = (monthStr) => {
+  if (!monthStr) return 0;
+  const parts = monthStr.split(" ");
+  if (parts.length < 2) return 0;
+  const [m, y] = parts;
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const monthIndex = monthNames.indexOf(m);
+  return new Date(parseInt(y), monthIndex).getTime();
+};
+
 // PDF Document Component - Grouped by Family
 const DonationPDF = ({ data, totalAmount, month, groupName }) => {
   // Group donations by group name
@@ -225,8 +248,31 @@ export default function DonationReportPage() {
 
   const [filterMonth, setFilterMonth] = useState([]);
   const [filterGroup, setFilterGroup] = useState("");
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+  const [activeTab, setActiveTab] = useState("details"); // 'details' or 'summary'
 
-  // Enrich donations with group names
+  const fileNameBase = useMemo(() => {
+    const monthLabel =
+      filterMonth && filterMonth.length > 0
+        ? filterMonth.map((m) => m.label).join("_")
+        : "All";
+    const gName =
+      (groups || []).find((g) => g.id === filterGroup)?.name || "All";
+    return `Donation_Report_${monthLabel}_${gName}`;
+  }, [filterMonth, filterGroup, groups]);
+
+  // 1. Stable months options for the Select component
+  const uniqueMonths = useMemo(() => {
+    if (!donations) return [];
+    const months = [...new Set(donations.map((d) => d.month))].filter(Boolean);
+    return months
+      .sort((a, b) => parseMonth(b) - parseMonth(a))
+      .map((m) => ({ value: m, label: m }));
+  }, [donations]);
+
+  // 2. Enrich donations with group names
   const enrichedDonations = useMemo(() => {
     if (!donations || !groups) return [];
     return donations.map((d) => ({
@@ -237,29 +283,90 @@ export default function DonationReportPage() {
     }));
   }, [donations, groups]);
 
-  const filteredData = enrichedDonations.filter((d) => {
-    // Multi-month filter logic
-    const matchMonth =
-      filterMonth && filterMonth.length > 0
-        ? filterMonth.some((m) => m.value === d.month)
-        : true;
+  // 3. Memoized filtering logic
+  const filteredData = useMemo(() => {
+    return enrichedDonations.filter((d) => {
+      // Multi-month filter logic - handle null/empty array from react-select
+      const matchMonth =
+        filterMonth && filterMonth.length > 0
+          ? filterMonth.some((m) => m?.value === d.month)
+          : true;
 
-    const matchGroup = filterGroup ? d.groupId === filterGroup : true;
-    // Safely check status, handling non-strings
-    const statusStr =
-      typeof d.status === "string" ? d.status : String(d.status || "");
-    const isApproved = statusStr.toLowerCase() === "approved";
-    return matchMonth && matchGroup && isApproved;
-  });
+      const matchGroup = filterGroup ? d.groupId === filterGroup : true;
 
-  const totalAmount = filteredData.reduce(
-    (sum, d) => sum + (Number(d.amount) || 0),
-    0,
-  );
+      // Safely check status
+      const statusStr = String(d.status || "").toLowerCase();
+      const isApproved = statusStr === "approved";
 
-  const uniqueMonths = [...new Set(donations?.map((d) => d.month) || [])]
-    .sort()
-    .map((m) => ({ value: m, label: m }));
+      return matchMonth && matchGroup && isApproved;
+    });
+  }, [enrichedDonations, filterMonth, filterGroup]);
+
+  // 4. Memoized totals
+  const totalAmount = useMemo(() => {
+    return filteredData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  }, [filteredData]);
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage]);
+
+  const summaryData = useMemo(() => {
+    if (!enrichedDonations || !groups) return { groups: [], months: [] };
+
+    // Filter donations by approved status (consistent with details)
+    const approvedDonations = enrichedDonations.filter(
+      (d) => String(d.status || "").toLowerCase() === "approved",
+    );
+
+    // Get months to display
+    let selectedMonths = [];
+    if (filterMonth && filterMonth.length > 0) {
+      selectedMonths = filterMonth
+        .map((m) => m.value)
+        .sort((a, b) => parseMonth(b) - parseMonth(a));
+    } else {
+      selectedMonths = [...new Set(approvedDonations.map((d) => d.month))]
+        .filter(Boolean)
+        .sort((a, b) => parseMonth(b) - parseMonth(a));
+    }
+
+    if (selectedMonths.length === 0) return { groups: [], months: [] };
+
+    const groupMap = {};
+    groups.forEach((g) => {
+      groupMap[g.id] = {
+        name: g.name,
+        id: g.id,
+        monthlyTotals: {},
+        total: 0,
+      };
+      selectedMonths.forEach((m) => {
+        groupMap[g.id].monthlyTotals[m] = 0;
+      });
+    });
+
+    approvedDonations.forEach((d) => {
+      if (groupMap[d.groupId] && selectedMonths.includes(d.month)) {
+        const amt = Number(d.amount) || 0;
+        groupMap[d.groupId].monthlyTotals[d.month] += amt;
+        groupMap[d.groupId].total += amt;
+      }
+    });
+
+    // For now showing all groups that have at least one donation in any month
+    const groupsWithDonations = Object.values(groupMap)
+      .filter((g) => g.total > 0)
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    return {
+      groups: groupsWithDonations,
+      months: selectedMonths,
+    };
+  }, [enrichedDonations, groups, filterMonth]);
 
   const getFormattedDate = (d) => {
     if (d.date && typeof d.date.toDate === "function") {
@@ -271,7 +378,6 @@ export default function DonationReportPage() {
     return "N/A";
   };
 
-  // Also fix the PDF data mapper if it uses similar logic
   const handleExportExcel = () => {
     try {
       const exportData = filteredData.map((d) => ({
@@ -288,17 +394,48 @@ export default function DonationReportPage() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Donations");
 
-      const monthLabel =
-        filterMonth && filterMonth.length > 0
-          ? filterMonth.map((m) => m.label).join("_")
-          : "All";
-
-      const fileName = `Donation_Report_${monthLabel}_${filterGroup ? groups.find((g) => g.id === filterGroup)?.name : "All"}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, `${fileNameBase}.xlsx`);
       toast.success("এক্সেল ফাইল ডাউনলোড শুরু হয়েছে");
     } catch (error) {
       console.error(error);
       toast.error("এক্সেল এক্সপোর্ট করতে সমস্যা হয়েছে");
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (filteredData.length === 0) return toast.error("কোনো ডাটা পাওয়া যায়নি");
+    setIsGeneratingPDF(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const doc = (
+        <DonationPDF
+          data={filteredData}
+          totalAmount={totalAmount}
+          month={
+            filterMonth && filterMonth.length > 0
+              ? filterMonth.map((m) => m.label).join(", ")
+              : "All Months"
+          }
+          groupName={
+            (groups || []).find((g) => g.id === filterGroup)?.name ||
+            "All Groups"
+          }
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${fileNameBase}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF ডাউনলোড শুরু হয়েছে");
+    } catch (error) {
+      console.error("PDF Error:", error);
+      toast.error("PDF তৈরি করতে সমস্যা হয়েছে");
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -330,7 +467,10 @@ export default function DonationReportPage() {
                 isMulti
                 options={uniqueMonths}
                 value={filterMonth}
-                onChange={setFilterMonth}
+                onChange={(val) => {
+                  setFilterMonth(val);
+                  setCurrentPage(1);
+                }}
                 placeholder="মাস নির্বাচন করুন..."
                 className="text-sm font-bold text-slate-700"
                 classNamePrefix="select"
@@ -339,7 +479,10 @@ export default function DonationReportPage() {
 
             <select
               value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
+              onChange={(e) => {
+                setFilterGroup(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">সকল গ্রুপ</option>
@@ -358,24 +501,23 @@ export default function DonationReportPage() {
                 <span>📊</span> Excel
               </button>
 
-              <PDFDownloadLink
-                document={
-                  <DonationPDF
-                    data={filteredData}
-                    totalAmount={totalAmount}
-                    month={
-                      filterMonth && filterMonth.length > 0
-                        ? filterMonth.map((m) => m.label).join(", ")
-                        : "All Months"
-                    }
-                    groupName={groups.find((g) => g.id === filterGroup)?.name}
-                  />
-                }
-                fileName={`Donation_Report_${filterMonth && filterMonth.length > 0 ? filterMonth.map((m) => m.label).join("_") : "All"}.pdf`}
-                className="px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors flex items-center gap-2 shadow-lg shadow-rose-200"
+              <button
+                onClick={handleExportPDF}
+                disabled={isGeneratingPDF}
+                className="px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors flex items-center gap-2 shadow-lg shadow-rose-200 disabled:opacity-50"
               >
-                {({ loading }) => (loading ? "প্রস্তুত হচ্ছে..." : "📄 PDF")}
-              </PDFDownloadLink>
+                {isGeneratingPDF ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>প্রস্তুত হচ্ছে...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📄</span>
+                    <span>PDF</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -385,7 +527,7 @@ export default function DonationReportPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 rounded-3xl text-white shadow-xl shadow-indigo-100">
           <p className="text-xs font-bold uppercase tracking-widest opacity-80">
-            মোট ড্রোনশন
+            মোট ডোনেশন
           </p>
           <p className="text-3xl font-black mt-2">
             ৳{totalAmount.toLocaleString()}
@@ -419,81 +561,216 @@ export default function DonationReportPage() {
         </div>
       </div>
 
-      {/* Details Table */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100">
-            <thead className="bg-slate-50/50">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  তারিখ
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  সদস্য
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  গ্রুপ
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  মাস
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  পরিমাণ
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredData.map((d, i) => (
-                <tr
-                  key={d.id}
-                  className="hover:bg-slate-50/50 transition-colors"
+      {/* Tabs */}
+      <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-2xl w-fit border border-slate-200">
+        <button
+          onClick={() => setActiveTab("details")}
+          className={`px-6 py-2 rounded-xl text-sm font-black transition-all duration-300 ${
+            activeTab === "details"
+              ? "bg-white text-indigo-600 shadow-md shadow-indigo-100"
+              : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+          }`}
+        >
+          বিস্তারিত তালিকা
+        </button>
+        <button
+          onClick={() => setActiveTab("summary")}
+          className={`px-6 py-2 rounded-xl text-sm font-black transition-all duration-300 ${
+            activeTab === "summary"
+              ? "bg-white text-indigo-600 shadow-md shadow-indigo-100"
+              : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+          }`}
+        >
+          গ্রুপ ও মাস ভিত্তিক সামারি
+        </button>
+      </div>
+
+      {/* Detailed Table Tab */}
+      {activeTab === "details" && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    তারিখ
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    সদস্য
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    গ্রুপ
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    মাস
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    পরিমাণ
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {paginatedData.map((d, i) => (
+                  <tr
+                    key={d.id}
+                    className="hover:bg-slate-50/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                      {getFormattedDate(d)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-slate-800">
+                        {d.userName}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        ID: {d.memberDisplayId || d.memberId}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold uppercase">
+                        {d.groupName}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 italic">
+                      {d.month}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-black text-slate-800">
+                      ৳{d.amount.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {paginatedData.length > 0 && (
+                <tfoot className="bg-slate-50/80 font-black">
+                  <tr>
+                    <td
+                      colSpan="4"
+                      className="px-6 py-4 text-right text-sm text-slate-600 uppercase"
+                    >
+                      মোট
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-indigo-700">
+                      ৳{totalAmount.toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+          {filteredData.length === 0 && (
+            <div className="py-20 text-center text-slate-400 italic">
+              কোনো ডাটা পাওয়া যায়নি
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-xs font-bold text-slate-400">
+                পৃষ্ঠা {currentPage} (মোট {totalPages})
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => prev - 1)}
+                  className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                    {getFormattedDate(d)}
+                  পূর্ববর্তী
+                </button>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                >
+                  পরবর্তী
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Group & Month Summary Tab */}
+      {activeTab === "summary" && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10">
+                    গ্রুপের নাম
+                  </th>
+                  {summaryData.months.map((m) => (
+                    <th
+                      key={m}
+                      className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest"
+                    >
+                      {m}
+                    </th>
+                  ))}
+                  <th className="px-6 py-4 text-right text-xs font-bold text-indigo-600 uppercase tracking-widest font-black">
+                    মোট
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {summaryData.groups.map((group) => (
+                  <tr
+                    key={group.id}
+                    className="hover:bg-slate-50/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800 sticky left-0 bg-white group-hover:bg-slate-50">
+                      {group.name}
+                    </td>
+                    {summaryData.months.map((m) => (
+                      <td
+                        key={m}
+                        className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-600 tabular-nums"
+                      >
+                        {group.monthlyTotals[m] > 0
+                          ? `৳${group.monthlyTotals[m].toLocaleString()}`
+                          : "-"}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-black text-indigo-700 tabular-nums">
+                      ৳{group.total.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50/80 font-black">
+                <tr>
+                  <td className="px-6 py-4 text-left text-sm text-slate-600 uppercase sticky left-0 bg-slate-50/80">
+                    সর্বমোট
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-slate-800">
-                      {d.userName}
-                    </div>
-                    <div className="text-[10px] text-slate-400">
-                      ID: {d.memberDisplayId || d.memberId}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold uppercase">
-                      {d.groupName}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 italic">
-                    {d.month}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-black text-slate-800">
-                    ৳{d.amount.toLocaleString()}
+                  {summaryData.months.map((m) => {
+                    const colTotal = summaryData.groups.reduce(
+                      (sum, g) => sum + (g.monthlyTotals[m] || 0),
+                      0,
+                    );
+                    return (
+                      <td
+                        key={m}
+                        className="px-6 py-4 text-right text-sm text-slate-800 tabular-nums"
+                      >
+                        ৳{colTotal.toLocaleString()}
+                      </td>
+                    );
+                  })}
+                  <td className="px-6 py-4 text-right text-sm text-indigo-700 tabular-nums">
+                    ৳{totalAmount.toLocaleString()}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-slate-50/80 font-black">
-              <tr>
-                <td
-                  colSpan="4"
-                  className="px-6 py-4 text-right text-sm text-slate-600 uppercase"
-                >
-                  মোট
-                </td>
-                <td className="px-6 py-4 text-right text-sm text-indigo-700">
-                  ৳{totalAmount.toLocaleString()}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        {filteredData.length === 0 && (
-          <div className="py-20 text-center text-slate-400 italic">
-            কোনো ডাটা পাওয়া যায়নি
+              </tfoot>
+            </table>
           </div>
-        )}
-      </div>
+          {summaryData.groups.length === 0 && (
+            <div className="py-20 text-center text-slate-400 italic">
+              কোনো সামারি ডাটা পাওয়া যায়নি
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

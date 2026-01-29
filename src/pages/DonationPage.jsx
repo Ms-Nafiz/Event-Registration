@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase";
 import { useData } from "../contexts/DataContext";
@@ -13,6 +13,8 @@ export default function DonationPage() {
   const [paymentMethod, setPaymentMethod] = useState("manual");
   const [loading, setLoading] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const handleDonate = async (e) => {
     e.preventDefault();
@@ -63,6 +65,37 @@ export default function DonationPage() {
       setLoading(false);
     }
   };
+
+  const currentMonthName = useMemo(() => {
+    const date = new Date();
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+  }, []);
+
+  const currentMonthDonations = useMemo(() => {
+    if (!donations) return [];
+    return donations.filter((d) => d.month === currentMonthName);
+  }, [donations, currentMonthName]);
+
+  const paginatedDonations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return currentMonthDonations.slice(start, start + pageSize);
+  }, [currentMonthDonations, currentPage]);
+
+  const totalPages = Math.ceil(currentMonthDonations.length / pageSize);
 
   return (
     <div className="font-bangla max-w-7xl mx-auto space-y-8 animate-fade-in">
@@ -209,14 +242,14 @@ export default function DonationPage() {
                 ডোনেশন হিস্ট্রি
               </h2>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                সর্বশেষ {donations.length} টি তথ্য
+                বর্তমান মাসের ({currentMonthName}) ডোনেশন
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
             <span className="px-4 py-1.5 bg-white rounded-xl shadow-sm text-sm font-black text-indigo-600 border border-slate-100 italic">
-              TOTAL: {donations.length}
+              TOTAL: {currentMonthDonations.length}
             </span>
           </div>
         </div>
@@ -254,7 +287,7 @@ export default function DonationPage() {
                     </div>
                   </td>
                 </tr>
-              ) : donations.length === 0 ? (
+              ) : currentMonthDonations.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-8 py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -268,7 +301,7 @@ export default function DonationPage() {
                   </td>
                 </tr>
               ) : (
-                donations.map((d, index) => (
+                paginatedDonations.map((d, index) => (
                   <tr
                     key={d.id}
                     className="group hover:bg-slate-50/80 transition-all duration-300"
@@ -338,6 +371,31 @@ export default function DonationPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400">
+              পৃষ্ঠা {currentPage} (মোট {totalPages})
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => prev - 1)}
+                className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                পূর্ববর্তী
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => prev + 1)}
+                className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                পরবর্তী
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

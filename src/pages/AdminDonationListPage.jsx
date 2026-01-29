@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { db } from "../firebase";
 import { useData } from "../contexts/DataContext";
 import {
@@ -41,6 +41,11 @@ export default function AdminDonationListPage() {
     yearlyStats: [],
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterGroup, setFilterGroup] = useState("");
+
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false,
     title: "",
@@ -56,6 +61,7 @@ export default function AdminDonationListPage() {
   }, [donations, groups, members, dataLoading]);
 
   const calculateSummaries = (dList, gList, mList) => {
+    if (!dList || !gList || !mList) return;
     const groupTotals = {};
     const memberTotals = {};
     const monthTotals = {};
@@ -269,14 +275,47 @@ export default function AdminDonationListPage() {
     });
   };
 
-  const [filterMonth, setFilterMonth] = useState("");
-  const [filterGroup, setFilterGroup] = useState("");
+  const parseMonth = (monthStr) => {
+    if (!monthStr) return new Date(0);
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const parts = monthStr.split(" ");
+    if (parts.length !== 2) return new Date(0);
+    const mIdx = months.indexOf(parts[0]);
+    return new Date(parts[1], mIdx);
+  };
 
-  const filteredDonations = donations.filter((d) => {
-    const matchMonth = filterMonth ? d.month === filterMonth : true;
-    const matchGroup = filterGroup ? d.groupId === filterGroup : true;
-    return matchMonth && matchGroup;
-  });
+  const sortedMonths = useMemo(() => {
+    if (!donations) return [];
+    return [...new Set(donations.map((d) => d.month))]
+      .filter(Boolean)
+      .sort((a, b) => parseMonth(b) - parseMonth(a));
+  }, [donations]);
+
+  const lastTwoMonths = sortedMonths.slice(0, 2);
+
+  const filteredDonations = useMemo(() => {
+    if (!donations) return [];
+    return donations.filter((d) => {
+      const matchMonth = filterMonth
+        ? d.month === filterMonth
+        : lastTwoMonths.includes(d.month);
+      const matchGroup = filterGroup ? d.groupId === filterGroup : true;
+      return matchMonth && matchGroup;
+    });
+  }, [donations, filterMonth, filterGroup, lastTwoMonths]);
 
   const totalAmount = filteredDonations.reduce(
     (sum, d) =>
@@ -284,7 +323,15 @@ export default function AdminDonationListPage() {
       (d.status?.toLowerCase() === "approved" ? Number(d.amount) || 0 : 0),
     0,
   );
-  const uniqueMonths = [...new Set(donations.map((d) => d.month))];
+
+  const paginatedDonations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredDonations.slice(start, start + pageSize);
+  }, [filteredDonations, currentPage]);
+
+  const totalPages = Math.ceil(filteredDonations.length / pageSize);
+
+  const uniqueMonths = sortedMonths;
 
   return (
     <div className="font-bangla min-h-screen bg-slate-50 p-4 md:p-8">
@@ -312,439 +359,351 @@ export default function AdminDonationListPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              {/* Total Collection */}
-              <div className="group bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-in animate-delay-100">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                    <CurrencyIcon />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      মোট সংগ্রহ
-                    </p>
-                    <h3 className="text-3xl font-black text-slate-800">
-                      ৳{totalAmount.toLocaleString()}
-                    </h3>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-slate-50">
-                  <p className="text-sm font-bold text-emerald-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    {
-                      filteredDonations.filter(
-                        (d) => d.status?.toLowerCase() === "approved",
-                      ).length
-                    }{" "}
-                    টি সফল ট্রানজেকশন
+            {/* Top Summaries: Performers & Monthly Trend */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+              {/* Top Member */}
+              <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+                <div className="relative z-10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">
+                    🏆 শীর্ষ দাতা (সদস্য)
                   </p>
+                  {summary.topMember ? (
+                    <>
+                      <h4 className="text-xl font-black truncate">
+                        {summary.topMember.name}
+                      </h4>
+                      <p className="text-3xl font-black mt-2">
+                        ৳{summary.topMember.total.toLocaleString()}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xl font-bold opacity-50">N/A</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Top Group */}
+              <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+                <div className="relative z-10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-purple-200 mb-1">
+                    🚩 শীর্ষ গ্রুপ
+                  </p>
+                  {summary.topGroup ? (
+                    <>
+                      <h4 className="text-xl font-black truncate">
+                        {summary.topGroup.name}
+                      </h4>
+                      <p className="text-3xl font-black mt-2">
+                        ৳{summary.topGroup.total.toLocaleString()}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xl font-bold opacity-50">N/A</p>
+                  )}
                 </div>
               </div>
 
               {/* Participation */}
-              <div className="group bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-in animate-delay-200">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                    <UsersIcon />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      অংশগ্রহণ হার
-                    </p>
-                    <h3 className="text-3xl font-black text-slate-800">
-                      {(
-                        (summary.participation.donated /
-                          (summary.participation.total || 1)) *
-                        100
-                      ).toFixed(0)}
-                      %
-                    </h3>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-slate-50">
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-1000"
-                      style={{
-                        width: `${(summary.participation.donated / (summary.participation.total || 1)) * 100}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pending Approvals */}
-              <div className="group bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-in animate-delay-300">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
-                    <ClockIcon />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      পেন্ডিং
-                    </p>
-                    <h3 className="text-3xl font-black text-slate-800">
-                      {
-                        filteredDonations.filter(
-                          (d) => d.status?.toLowerCase() !== "approved",
-                        ).length
-                      }
-                    </h3>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-slate-50">
-                  <p className="text-sm font-bold text-amber-600">
-                    ম্যানুয়াল অ্যাপ্রুভাল প্রয়োজন
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center">
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    অংশগ্রহণ হার
                   </p>
+                  <span className="text-lg font-black text-slate-800">
+                    {(
+                      (summary.participation.donated /
+                        (summary.participation.total || 1)) *
+                      100
+                    ).toFixed(0)}
+                    %
+                  </span>
                 </div>
-              </div>
-
-              {/* Non-Donors */}
-              <div className="group bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-in animate-delay-500">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors duration-300">
-                    <EmptyIcon />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      বাকি আছে
-                    </p>
-                    <h3 className="text-3xl font-black text-slate-800">
-                      {summary.nonDonatingMembers.length}
-                    </h3>
-                  </div>
+                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(summary.participation.donated / (summary.participation.total || 1)) * 100}%`,
+                    }}
+                  ></div>
                 </div>
-                <div className="pt-4 border-t border-slate-50">
-                  <p className="text-sm font-bold text-red-600">
-                    {summary.zeroDonationGroups.length} টি গ্রুপ থেকে আসেনি
-                  </p>
-                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-bold">
+                  {summary.participation.donated} /{" "}
+                  {summary.participation.total} সদস্য দান করেছেন
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Main Table Area */}
-              <div className="lg:col-span-8 space-y-6">
-                {/* Search & Actions Bar */}
-                <div className="sticky top-4 z-30 bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/50 flex flex-wrap gap-4 items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex shrink-0">
-                      <select
-                        value={filterMonth}
-                        onChange={(e) => setFilterMonth(e.target.value)}
-                        className="pl-4 pr-10 py-2.5 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">সকল মাস</option>
-                        {uniqueMonths.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex shrink-0">
-                      <select
-                        value={filterGroup}
-                        onChange={(e) => setFilterGroup(e.target.value)}
-                        className="pl-4 pr-10 py-2.5 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">সকল গ্রুপ</option>
-                        {groups.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleBulkApprove}
-                      disabled={
-                        bulkProcessing ||
-                        !filteredDonations.some(
-                          (d) => d.status?.toLowerCase() !== "approved",
-                        )
-                      }
-                      className={`px-6 py-2.5 rounded-2xl text-sm font-black transition-all duration-300 shadow-md flex items-center gap-2 ${
-                        filteredDonations.some(
-                          (d) => d.status?.toLowerCase() !== "approved",
-                        )
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-emerald-200 hover:scale-105 active:scale-95"
-                          : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                      }`}
+            {/* Monthly Donation Summary Row */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2">
+                  <span className="w-2 h-4 bg-indigo-600 rounded-full"></span>
+                  মাসিক ডোনেশন সামারি
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {Object.entries(summary.monthlyStats)
+                  .sort((a, b) => parseMonth(b[0]) - parseMonth(a[0]))
+                  .slice(0, 6)
+                  .map(([month, total]) => (
+                    <div
+                      key={month}
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors"
                     >
-                      {bulkProcessing ? "প্রসেসিং..." : "সব অ্যাপ্রুভ করুন"}
-                    </button>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">
+                        {month}
+                      </p>
+                      <p className="text-lg font-black text-slate-800 mt-1">
+                        ৳{total.toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* Collection Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-emerald-500">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    নির্বাচিত সংগ্রহ
+                  </p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">
+                    ৳{totalAmount.toLocaleString()}
+                  </h3>
+                </div>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-amber-500">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    পেন্ডিং ডোনেশন
+                  </p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">
+                    {
+                      filteredDonations.filter(
+                        (d) => d.status?.toLowerCase() !== "approved",
+                      ).length
+                    }
+                  </h3>
+                </div>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 border-l-4 border-l-indigo-500">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    মোট ট্রানজেকশন
+                  </p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">
+                    {filteredDonations.length}
+                  </h3>
+                </div>
+              </div>
+              {/* Search & Actions Bar */}
+              <div className="sticky top-4 z-30 bg-white/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/50 flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex shrink-0">
+                    <select
+                      value={filterMonth}
+                      onChange={(e) => {
+                        setFilterMonth(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="pl-4 pr-10 py-2.5 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="">শেষ ২ মাস</option>
+                      {uniqueMonths.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex shrink-0">
+                    <select
+                      value={filterGroup}
+                      onChange={(e) => {
+                        setFilterGroup(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="pl-4 pr-10 py-2.5 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="">সকল গ্রুপ</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                {/* Premium Table Card */}
-                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden animate-fade-in">
-                  <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/50">
-                          <th className="group px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                            তারিখ
-                          </th>
-                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                            সদস্য ও গ্রুপ
-                          </th>
-                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">
-                            পরিমাণ
-                          </th>
-                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">
-                            স্ট্যাটাস
-                          </th>
-                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">
-                            অ্যাকশন
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {loading ? (
-                          [1, 2, 3, 4, 5].map((i) => (
-                            <tr key={i} className="animate-pulse">
-                              <td
-                                colSpan="5"
-                                className="px-8 py-6 h-16 bg-slate-50/20"
-                              ></td>
-                            </tr>
-                          ))
-                        ) : filteredDonations.length === 0 ? (
-                          <tr>
-                            <td colSpan="5" className="px-8 py-20 text-center">
-                              <div className="flex flex-col items-center gap-3 grayscale opacity-30">
-                                <EmptyIcon />
-                                <p className="text-sm font-bold text-slate-500">
-                                  কোথাও কোনো ডোনেশন পাওয়া যায়নি!
-                                </p>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredDonations.map((d) => (
-                            <tr
-                              key={d.id}
-                              className="group hover:bg-slate-50/50 transition-colors duration-200"
-                            >
-                              <td className="px-8 py-6 whitespace-nowrap">
-                                <span className="text-sm font-bold text-slate-600 bg-slate-100/50 px-3 py-1 rounded-lg">
-                                  {d.date?.toDate
-                                    ? d.date
-                                        .toDate()
-                                        .toLocaleDateString("bn-BD")
-                                    : new Date(d.createdAt).toLocaleDateString(
-                                        "bn-BD",
-                                      )}
-                                </span>
-                              </td>
-                              <td className="px-8 py-6">
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-black text-slate-800">
-                                    {d.userName}
-                                  </span>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md uppercase">
-                                      {groups.find((g) => g.id === d.groupId)
-                                        ?.name || "N/A"}
-                                    </span>
-                                    <span className="text-[10px] font-medium text-slate-400">
-                                      ID: {d.memberDisplayId || d.memberId}
-                                    </span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-8 py-6 text-right">
-                                <span className="text-lg font-black text-indigo-600 tracking-tight">
-                                  ৳{d.amount.toLocaleString()}
-                                </span>
-                              </td>
-                              <td className="px-8 py-6 text-center">
-                                <span
-                                  className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                    d.status?.toLowerCase() === "approved"
-                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                      : "bg-amber-50 text-amber-600 border border-amber-100 animate-pulse"
-                                  }`}
-                                >
-                                  {d.status?.toLowerCase() === "approved"
-                                    ? "অনুমোদিত"
-                                    : "অপেক্ষমান"}
-                                </span>
-                              </td>
-                              <td className="px-8 py-6 text-right">
-                                <div className="flex justify-end gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                                  {d.status?.toLowerCase() !== "approved" && (
-                                    <button
-                                      onClick={() => handleApprove(d.id)}
-                                      className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 active:scale-90 transition-transform"
-                                    >
-                                      ✓
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => handleEditClick(d)}
-                                    className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-200 hover:scale-110 active:scale-90 transition-transform"
-                                  >
-                                    ✎
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(d.id)}
-                                    className="w-8 h-8 flex items-center justify-center bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-200 hover:scale-110 active:scale-90 transition-transform"
-                                  >
-                                    🗑
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleBulkApprove}
+                    disabled={
+                      bulkProcessing ||
+                      !filteredDonations.some(
+                        (d) => d.status?.toLowerCase() !== "approved",
+                      )
+                    }
+                    className={`px-6 py-2.5 rounded-2xl text-sm font-black transition-all duration-300 shadow-md flex items-center gap-2 ${
+                      filteredDonations.some(
+                        (d) => d.status?.toLowerCase() !== "approved",
+                      )
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-emerald-200 hover:scale-105 active:scale-95"
+                        : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {bulkProcessing ? "প্রসেসিং..." : "সব অ্যাপ্রুভ করুন"}
+                  </button>
                 </div>
               </div>
 
-              {/* Sidebar Area */}
-              <div className="lg:col-span-4 space-y-8 sticky top-4">
-                {/* Top Performers Card */}
-                <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden animate-fade-in animate-delay-300">
-                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-xl">
-                        🏆
-                      </div>
-                      <div>
-                        <h3 className="text-base font-black uppercase tracking-widest text-indigo-100">
-                          সেরা পারফর্মার
-                        </h3>
-                        <p className="text-xs text-indigo-200/70">
-                          এই ইভেন্টের হিরোরা
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      {summary.topMember && (
-                        <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
-                          <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">
-                            সর্বোচ্চ দাতা
-                          </p>
-                          <h4 className="text-xl font-black truncate">
-                            {summary.topMember.name}
-                          </h4>
-                          <p className="text-3xl font-black mt-2">
-                            ৳{summary.topMember.total.toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-
-                      {summary.topGroup && (
-                        <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 hover:bg-white/20 transition-all cursor-default">
-                          <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">
-                            শীর্ষ গ্রুপ
-                          </p>
-                          <h4 className="text-xl font-black truncate">
-                            {summary.topGroup.name}
-                          </h4>
-                          <p className="text-3xl font-black mt-2">
-                            ৳{summary.topGroup.total.toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monthly Trend List */}
-                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden animate-fade-in animate-delay-200">
-                  <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px]">
-                      মাসিক ট্রেন্ড
-                    </h3>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {Object.keys(summary.monthlyStats).length} মাস
-                    </span>
-                  </div>
-                  <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    <div className="grid grid-cols-1 gap-2">
-                      {Object.entries(summary.monthlyStats)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([month, total], idx) => (
-                          <div
-                            key={month}
-                            className="group flex items-center justify-between p-3 bg-slate-50/50 hover:bg-indigo-50/50 rounded-2xl transition-all duration-300"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-black text-slate-300">
-                                0{idx + 1}
-                              </span>
-                              <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                                {month}
-                              </span>
+              {/* Premium Table Card */}
+              <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden animate-fade-in">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="group px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                          তারিখ
+                        </th>
+                        <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                          সদস্য ও গ্রুপ
+                        </th>
+                        <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">
+                          পরিমাণ
+                        </th>
+                        <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">
+                          স্ট্যাটাস
+                        </th>
+                        <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">
+                          অ্যাকশন
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {loading ? (
+                        [1, 2, 3, 4, 5].map((i) => (
+                          <tr key={i} className="animate-pulse">
+                            <td
+                              colSpan="5"
+                              className="px-8 py-6 h-16 bg-slate-50/20"
+                            ></td>
+                          </tr>
+                        ))
+                      ) : paginatedDonations.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="px-8 py-20 text-center">
+                            <div className="flex flex-col items-center gap-3 grayscale opacity-30">
+                              <EmptyIcon />
+                              <p className="text-sm font-bold text-slate-500">
+                                এই সময়ে কোনো ডোনেশন তথ্য নেই!
+                              </p>
                             </div>
-                            <span className="text-sm font-black text-slate-800 tracking-tight">
-                              ৳{total.toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Non-Donating Members List */}
-                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden animate-fade-in animate-delay-500">
-                  <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px]">
-                      ডোনেশন দেয়নি
-                    </h3>
-                    <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-md text-[10px] font-black">
-                      {summary.nonDonatingMembers.length}
-                    </span>
-                  </div>
-                  <div className="p-4 max-h-[350px] overflow-y-auto custom-scrollbar">
-                    {summary.nonDonatingMembers.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2">
-                        {summary.nonDonatingMembers.map((m) => (
-                          <div
-                            key={m.id}
-                            className="group p-3 rounded-2xl bg-slate-50/50 border border-transparent hover:border-red-100 hover:bg-red-50/30 transition-all duration-300"
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedDonations.map((d) => (
+                          <tr
+                            key={d.id}
+                            className="group hover:bg-slate-50/50 transition-colors duration-200"
                           >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${m.gender === "Female" ? "bg-gradient-to-br from-pink-400 to-rose-500" : "bg-gradient-to-br from-indigo-400 to-blue-500"}`}
+                            <td className="px-8 py-6 whitespace-nowrap">
+                              <span className="text-sm font-bold text-slate-600 bg-slate-100/50 px-3 py-1 rounded-lg">
+                                {d.date?.toDate
+                                  ? d.date.toDate().toLocaleDateString("bn-BD")
+                                  : new Date(d.createdAt).toLocaleDateString(
+                                      "bn-BD",
+                                    )}
+                              </span>
+                            </td>
+                            <td className="px-8 py-6">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-black text-slate-800">
+                                  {d.userName}
+                                </span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md uppercase">
+                                    {groups.find((g) => g.id === d.groupId)
+                                      ?.name || "N/A"}
+                                  </span>
+                                  <span className="text-[10px] font-medium text-slate-400">
+                                    ID: {d.memberDisplayId || d.memberId}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-8 py-6 text-right">
+                              <span className="text-lg font-black text-indigo-600 tracking-tight">
+                                ৳{d.amount.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-8 py-6 text-center">
+                              <span
+                                className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                  d.status?.toLowerCase() === "approved"
+                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                    : "bg-amber-50 text-amber-600 border border-amber-100 animate-pulse"
+                                }`}
                               >
-                                {m.name.charAt(0)}
+                                {d.status?.toLowerCase() === "approved"
+                                  ? "অনুমোদিত"
+                                  : "অপেক্ষমান"}
+                              </span>
+                            </td>
+                            <td className="px-8 py-6 text-right">
+                              <div className="flex justify-end gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                {d.status?.toLowerCase() !== "approved" && (
+                                  <button
+                                    onClick={() => handleApprove(d.id)}
+                                    className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-200 hover:scale-110 active:scale-90 transition-transform"
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleEditClick(d)}
+                                  className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-200 hover:scale-110 active:scale-90 transition-transform"
+                                >
+                                  ✎
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(d.id)}
+                                  className="w-8 h-8 flex items-center justify-center bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-200 hover:scale-110 active:scale-90 transition-transform"
+                                >
+                                  🗑
+                                </button>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-700 truncate group-hover:text-slate-900 transition-colors">
-                                  {m.name}
-                                </p>
-                                <p className="text-[10px] text-slate-400">
-                                  ID: {m.displayId || m.uniqueId}
-                                </p>
-                              </div>
-                              <div className="w-1.5 h-1.5 rounded-full bg-red-400 group-hover:scale-125 transition-transform"></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-xl">
-                          🎉
-                        </div>
-                        <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">
-                          সব সদস্য দান করেছেন!
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-400">
+                      পৃষ্ঠা {currentPage} (মোট {totalPages})
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((prev) => prev - 1)}
+                        className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                      >
+                        পূর্ববর্তী
+                      </button>
+                      <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((prev) => prev + 1)}
+                        className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                      >
+                        পরবর্তী
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>

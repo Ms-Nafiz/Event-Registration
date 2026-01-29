@@ -67,6 +67,9 @@ export default function FamilyMembersPage() {
   const [editingMember, setEditingMember] = useState(null);
   const [viewingMember, setViewingMember] = useState(null);
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportGroups, setExportGroups] = useState([]);
+  const [exportGenerations, setExportGenerations] = useState([]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -323,6 +326,93 @@ export default function FamilyMembersPage() {
     toast.success("স্যাম্পল ফাইল ডাউনলোড হচ্ছে...");
   };
 
+  const handleExportExcel = (type) => {
+    const workbook = XLSX.utils.book_new();
+
+    const mapMember = (m) => ({
+      ID: m.displayId || m.uniqueId,
+      নাম: m.name,
+      লিঙ্গ: m.gender === "Male" ? "পুরুষ" : "মহিলা",
+      মোবাইল: m.phone || "-",
+      ঠিকানা: m.address || "-",
+      জেনারেশন: m.generation,
+      পিতা: members.find((f) => f.uniqueId === m.fatherId)?.name || "-",
+      মাতা: members.find((mo) => mo.uniqueId === m.motherId)?.name || "-",
+      পেশা: m.profession || "-",
+      "জন্ম সাল": m.birthYear || "-",
+      জীবিত: m.alive ? "হ্যাঁ" : "না",
+      "মৃত্যু সাল": m.deathYear || "-",
+      গ্রুপ:
+        groups.find((g) => g.id == m.groupid || g.name == m.groupid)?.name ||
+        m.groupid ||
+        "-",
+    });
+
+    // 1. Filter by selected groups
+    let filteredForExport = members;
+    if (exportGroups.length > 0) {
+      filteredForExport = filteredForExport.filter((m) => {
+        const mGid = m.groupid || m.groupId;
+        return exportGroups.includes(mGid?.toString());
+      });
+    }
+
+    // 2. Filter by selected generations
+    if (exportGenerations.length > 0) {
+      filteredForExport = filteredForExport.filter((m) =>
+        exportGenerations.includes(m.generation?.toString()),
+      );
+    }
+
+    if (filteredForExport.length === 0) {
+      return toast.error("সিলেক্ট করা ফিল্টার অনুযায়ী কোনো সদস্য পাওয়া যায়নি।");
+    }
+
+    if (type === "all") {
+      const data = filteredForExport.map(mapMember);
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Selected Members");
+    } else if (type === "group") {
+      const groupsToProcess = exportGroups.length > 0 
+        ? groups.filter(g => exportGroups.includes(g.id.toString()) || exportGroups.includes(g.name))
+        : groups;
+
+      groupsToProcess.forEach((group) => {
+        const groupMembers = filteredForExport.filter(
+          (m) => m.groupid == group.id || m.groupid == group.name,
+        );
+        if (groupMembers.length > 0) {
+          const data = groupMembers.map(mapMember);
+          const worksheet = XLSX.utils.json_to_sheet(data);
+          const sheetName = group.name.replace(/[\[\]\*\?\/\\]/g, "").substring(0, 31);
+          XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || `Group ${group.id}`);
+        }
+      });
+    } else if (type === "generation") {
+      const gensToProcess = exportGenerations.length > 0
+        ? exportGenerations.sort((a, b) => a - b)
+        : [...new Set(filteredForExport.map((m) => m.generation?.toString()))]
+            .filter(Boolean)
+            .sort((a, b) => a - b);
+      
+      gensToProcess.forEach((gen) => {
+        const genMembers = filteredForExport.filter((m) => m.generation?.toString() === gen);
+        if (genMembers.length > 0) {
+          const data = genMembers.map(mapMember);
+          const worksheet = XLSX.utils.json_to_sheet(data);
+          XLSX.utils.book_append_sheet(workbook, worksheet, `Generation ${gen}`);
+        }
+      });
+    }
+
+    XLSX.writeFile(
+      workbook,
+      `family_members_${type}_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+    toast.success("এক্সেল ফাইল ডাউনলোড হচ্ছে...");
+    setIsExportModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -376,6 +466,14 @@ export default function FamilyMembersPage() {
               title="স্যাম্পল ফাইল ডাউনলোড"
             >
               📥
+            </button>
+
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="px-4 py-2.5 bg-green-50 text-green-600 border border-green-100 rounded-xl font-bold text-sm hover:bg-green-100 transition-all flex items-center gap-2"
+              title="এক্সপোর্ট করুন"
+            >
+              <span>📊</span> এক্সপোর্ট
             </button>
 
             <Link
@@ -1438,6 +1536,220 @@ export default function FamilyMembersPage() {
             </div>
             {/* Decorative bottom bar */}
             <div className="h-1.5 bg-gradient-to-r from-rose-500 to-rose-600"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Options Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            onClick={() => setIsExportModalOpen(false)}
+          ></div>
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl relative z-10 overflow-hidden animate-in fade-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <div className="p-8 overflow-y-auto custom-scrollbar">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800">
+                    অ্যাডভান্সড এক্সপোর্ট
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    নির্দিষ্ট গ্রুপ এবং জেনারেশন সিলেক্ট করে ডাউনলোড করুন
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-500 p-2 rounded-full transition-all"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                {/* Group Selection */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      👥 গ্রুপ বাছাই করুন
+                      <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-500">
+                        {exportGroups.length}/{groups.length}
+                      </span>
+                    </label>
+                    <button
+                      onClick={() =>
+                        setExportGroups(
+                          exportGroups.length === groups.length
+                            ? []
+                            : groups.map((g) => g.id.toString()),
+                        )
+                      }
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >
+                      {exportGroups.length === groups.length
+                        ? "সব বাদ দিন"
+                        : "সব সিলেক্ট করুন"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {groups.map((group) => (
+                      <button
+                        key={group.id}
+                        onClick={() => {
+                          const gid = group.id.toString();
+                          setExportGroups((prev) =>
+                            prev.includes(gid)
+                              ? prev.filter((i) => i !== gid)
+                              : [...prev, gid],
+                          );
+                        }}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          exportGroups.includes(group.id.toString())
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20"
+                            : "bg-slate-50 text-slate-600 border-slate-100 hover:border-indigo-200"
+                        }`}
+                      >
+                        {group.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Generation Selection */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      🌳 জেনারেশন বাছাই করুন
+                      <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-500">
+                        {exportGenerations.length}/{generations.length}
+                      </span>
+                    </label>
+                    <button
+                      onClick={() =>
+                        setExportGenerations(
+                          exportGenerations.length === generations.length
+                            ? []
+                            : generations,
+                        )
+                      }
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >
+                      {exportGenerations.length === generations.length
+                        ? "সব বাদ দিন"
+                        : "সব সিলেক্ট করুন"}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {generations.map((gen) => (
+                      <button
+                        key={gen}
+                        onClick={() => {
+                          const sGen = gen.toString();
+                          setExportGenerations((prev) =>
+                            prev.includes(sGen)
+                              ? prev.filter((i) => i !== sGen)
+                              : [...prev, sGen],
+                          );
+                        }}
+                        className={`w-12 h-12 rounded-xl text-xs font-black transition-all border flex items-center justify-center ${
+                          exportGenerations.includes(gen.toString())
+                            ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
+                            : "bg-slate-50 text-slate-600 border-slate-100 hover:border-amber-200"
+                        }`}
+                      >
+                        G{gen}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Export Modes */}
+                <div className="pt-8 border-t border-slate-100">
+                  <label className="text-sm font-black text-slate-700 uppercase tracking-wider block mb-4">
+                    📥 এক্সপোর্ট ফরম্যাট
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <button
+                      onClick={() => handleExportExcel("all")}
+                      className="p-4 bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 rounded-3xl flex flex-col items-center gap-2 group transition-all"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">
+                        📄
+                      </span>
+                      <div className="text-center">
+                        <p className="font-bold text-slate-800 text-xs">
+                          সব এক সিটে
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Single Sheet
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => handleExportExcel("group")}
+                      className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-100 hover:border-emerald-100 rounded-3xl flex flex-col items-center gap-2 group transition-all"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">
+                        📑
+                      </span>
+                      <div className="text-center">
+                        <p className="font-bold text-slate-800 text-xs">
+                          গ্রুপ ভিত্তিক আলাদা
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Multiple Sheets
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => handleExportExcel("generation")}
+                      className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-100 hover:border-amber-100 rounded-3xl flex flex-col items-center gap-2 group transition-all"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">
+                        📚
+                      </span>
+                      <div className="text-center">
+                        <p className="font-bold text-slate-800 text-xs">
+                          জেনারেশন ভিত্তিক আলাদা
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Multiple Sheets
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 shrink-0 border-t border-slate-100 flex justify-between items-center">
+              <div className="text-xs font-bold text-slate-400">
+                *{exportGroups.length === 0 && exportGenerations.length === 0
+                  ? "কোনো ফিল্টার না দিলে সব ডাটা আসবে"
+                  : "সিলেক্ট করা ফিল্টার প্রয়োগ হবে"}
+              </div>
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-8 py-3 bg-slate-800 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-900 transition-all active:scale-95"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+            <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-emerald-500 to-amber-500"></div>
           </div>
         </div>
       )}
