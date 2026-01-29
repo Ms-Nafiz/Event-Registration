@@ -14,7 +14,7 @@ export default function Loader() {
 
             {/* Inner gradient circle */}
             <div className="absolute inset-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl font-bold">B</span>
+              <span className="text-white text-2xl font-bold">HF</span>
             </div>
           </div>
         </div>
@@ -22,7 +22,7 @@ export default function Loader() {
         {/* Loading text with dots animation */}
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-gray-800 font-bangla">
-            বংশ ইভেন্ট
+            হরকরা ফাউন্ডেশন
           </h2>
           <div className="flex items-center justify-center gap-1 text-gray-600">
             <span className="text-sm font-medium">Loading</span>

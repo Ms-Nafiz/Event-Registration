@@ -25,6 +25,7 @@ import DonationReportPage from "./pages/DonationReportPage";
 
 // --- পাবলিক পেজ ---
 import PublicEventRegistration from "./pages/RegistrationFormPage";
+import PublicDonationReportPage from "./pages/PublicDonationReportPage";
 
 // ১. গেস্ট রুট: লগইন করা থাকলে ড্যাশবোর্ডে পাঠাবে
 function GuestRoute({ children }) {
@@ -68,6 +69,7 @@ function App() {
     <Routes>
       {/* ১. পাবলিক রুট */}
       <Route path="/event-registration" element={<PublicEventRegistration />} />
+      <Route path="/check-donation" element={<PublicDonationReportPage />} />
       <Route path="/" element={<Login />} />
 
       {/* ২. লগইন/রেজিস্টার (গেস্ট রুট) */}
